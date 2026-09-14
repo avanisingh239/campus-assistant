@@ -108,7 +108,7 @@ This system enforces an absolute separation:
 * **Action Generation:** Synthesizes a 1-sentence "Why It Matters" (consequence) and a 1-verb "What To Do Next" directive based strictly on context.
 
 > [!IMPORTANT]
-> **AI Output is Untrusted Input:** The JSON returned by Gemini/Ollama is treated as untrusted user input. It is passed through a strict Zod runtime schema validation before being processed by backend business logic.
+> **AI Output is Untrusted Input:** The JSON returned by the Claude API is treated as untrusted user input. It is passed through a strict Zod runtime schema validation before being processed by backend business logic.
 
 ### 3.2 Deterministic Code Responsibilities (Mathematical Certainty)
 * **Clash Detection:** Pure interval comparison against confirmed timetable entries, covering all three clash types:
@@ -170,7 +170,7 @@ Data privacy is guaranteed at the database engine level through Supabase RLS:
 
 * **MVP Architecture:**
   * Ingestion: Client-side Bulk Paste & Chat Export parsing.
-  * AI: Server Action calling Google Gemini 1.5 Flash with structured JSON schema output.
+  * AI: Server Action calling the Claude API (Anthropic) with structured JSON schema output.
   * Logic: In-memory/Node.js deterministic engines for all 3 clash types, free slots, and deduplication.
   * Database: Supabase PostgreSQL with core RLS policies enforcing raw message privacy.
 * **Phase 2 Architecture — Deferred but Committed:**

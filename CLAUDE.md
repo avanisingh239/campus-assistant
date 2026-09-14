@@ -4,61 +4,87 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-This repository currently contains **specifications only — no application code has been written yet**. There is no `package.json`, no Next.js project, no Supabase migrations, and no tests. `README.md`, `GEMINI.md`, `.env.example`, and `supabase/seed.sql` all exist but are empty placeholders. Git history is three "docs:" commits.
+This is a Next.js 15 (App Router, TypeScript) + Supabase + Claude API project. The scaffold, auth/role routing skeleton, and one real end-to-end pipeline (paste text → Claude extraction → validated data → database rows) exist and are wired up. **The actual student/admin dashboard UI does not exist yet** — every page under `app/student/*` and `app/admin/*` is a one-line placeholder, deliberately, because that UI is being designed separately and will replace these placeholders. Don't build real dashboard UI into those routes without being asked; do wire up data/logic that a future UI will need.
 
-Before writing any code, read the docs below — they are the **authoritative, approved spec** for what to build. Do not invent features, routes, or schema fields that aren't described in them; where a doc marks something `Unresolved` or `Deferred but Committed`, treat it as explicitly out of scope until the user says otherwise.
+Before writing feature code, read the docs below — they are the **authoritative, approved spec** for what to build, with one correction: **`supabase/schema.sql` is the single source of truth for the database schema**, not `docs/data-model.md`'s prose (that file is now a walkthrough of the real schema, kept in sync by hand — if they disagree, the SQL file wins). Where a doc marks something `Unresolved` or `Deferred but Committed`, treat it as explicitly out of scope until the user says otherwise.
 
-Because there is no scaffold yet, **there are no build/lint/test commands to run**. The first implementation task will be scaffolding the Next.js 15 (App Router) + TypeScript + Supabase project described in `docs/architecture.md`. Once that scaffold exists, update this file with the real build/lint/test/dev commands.
+## Commands
+
+```bash
+npm install        # first-time setup
+npm run dev         # dev server, http://localhost:3000
+npm run build       # production build — also does the App Router route-collision /
+                    # type check that `tsc` alone won't catch
+npm run lint        # eslint .
+npm run typecheck   # tsc --noEmit
+npm run test        # vitest run (unit tests only — no integration/E2E suite yet)
+```
+
+Run a single test file: `npx vitest run lib/ai/extraction-schema.test.ts`. Tests are colocated as `*.test.ts` next to the code they cover (`lib/ai/extraction-schema.test.ts`, `lib/ingestion/map-to-announcement.test.ts`) — they're pure unit tests with no network/DB access, so they run without any env vars set.
+
+**Before every commit that touches `app/**`, run `npm run build`, not just `npm run typecheck`.** The App Router's route-collision check (two pages resolving to the same URL, a Server Action exported from a bad location, etc.) only runs during `next build` / `next dev`, not `tsc --noEmit` — this bit the initial scaffold (`(student)/dashboard` and `(admin)/dashboard` both resolved to `/dashboard` because route groups don't add a URL segment; see §Route tree below for why `student/` and `admin/` are real folders, not groups).
+
+### Environment variables
+
+Copy `.env.example` to `.env.local` and fill in:
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase project API settings.
+- `SUPABASE_SERVICE_ROLE_KEY` — **server-only**, never exposed to the browser. Required because `messages` and `announcements` have no INSERT policy for `authenticated` (see §Data model below) — the ingestion pipeline writes through `lib/supabase/admin.ts` instead.
+- `ANTHROPIC_API_KEY` — for `lib/ai/claude.ts`.
+
+Nothing in this repo talks to a live Supabase project or the Claude API without these set. `npm run build`/`lint`/`typecheck`/`test` all succeed with no env vars at all (verified) — only `npm run dev` and actually running the ingestion pipeline need them.
 
 ## Authoritative docs (read in this order)
 
-- `docs/product-spec.md` — product philosophy, full screen/feature breakdown for Student and Admin experiences, MVP vs. Phase 2 vs. Stretch phasing table, and the list of **Unresolved Product Decisions** (enrollment verification, cross-section cancellations, raw-message retention policy) that must not be implemented until resolved.
-- `docs/architecture.md` — the system diagram, Next.js route tree, component/drawer layer, and the strict AI/deterministic boundary (see below).
-- `docs/data-model.md` — full Postgres DDL for all 11 tables plus RLS policies. This is the canonical schema; implement it as-is rather than re-deriving it.
-- `docs/ai-contracts.md` — the exact system prompt, Zod schema, and JSON schema the extraction AI must conform to, plus the 9 ingestion UI states and their user-facing copy.
-- `docs/requirements-traceability.md` — maps every feature ID to its screen, DB impact, AI vs. deterministic responsibility, and acceptance criteria. Useful as a checklist when implementing a feature.
-- `docs/figma-screen-inventory.md` — per-screen component inventory tagged `Requirement` / `Approved Product Decision` / `Proposed Addition — Requires Approval` / `Design Suggestion` / `Unresolved`. Only `Requirement` and `Approved Product Decision` items are committed; don't build `Proposed Addition` items without asking.
-- `docs/feature-list (1).docx` — original source-of-truth feature list referenced by the other docs (binary; read via the docx skill if content is needed).
+- `docs/product-spec.md` — product philosophy, full screen/feature breakdown for Student and Admin experiences, MVP vs. Phase 2 vs. Stretch phasing table, and the list of **Unresolved Product Decisions** that must not be implemented until resolved.
+- `docs/architecture.md` — system diagram, route tree, component/drawer layer, the AI/deterministic boundary (see below). Its "AI: Gemini" references have been corrected to the Claude API; everything else is still accurate design reference.
+- `supabase/schema.sql` — the live, applied Postgres schema (enums, tables, RLS policies) with closing notes on what the deterministic engine still needs to do. **Canonical.**
+- `docs/data-model.md` — narrative walkthrough of `supabase/schema.sql`, including a callout of every field name that changed from the original (superseded) 11-table draft. Read this to understand *why* a table looks the way it does; read the SQL file for the literal truth.
+- `docs/ai-contracts.md` — the Claude API system prompt, the Zod extraction schema (mirrors `announcements` column-for-column — see its §3 callout for the fields that were removed because no matching column exists, like `course_code`/`location_room`), and the 9 ingestion UI states.
+- `docs/requirements-traceability.md` — maps every feature ID to its screen, DB impact, AI vs. deterministic responsibility, and acceptance criteria.
+- `docs/figma-screen-inventory.md` — per-screen component inventory tagged `Requirement` / `Approved Product Decision` / `Proposed Addition — Requires Approval` / `Design Suggestion` / `Unresolved`. Only the first two are committed.
 
-`docs/decision-log.md`, `docs/security-model.md`, and `docs/testing-strategy.md` are currently empty — check them for content before assuming there's no guidance there, since they may be filled in later.
+`docs/decision-log.md`, `docs/security-model.md`, and `docs/testing-strategy.md` are currently empty — check them for content before assuming there's no guidance there.
 
 ## Core architectural rule: AI extracts, deterministic code decides
 
-This is the single most important constraint in the whole system and governs how any backend code must be split:
+- **Claude (`claude-opus-5`, via `lib/ai/claude.ts` / `lib/ai/extract.ts`) is only allowed to write**: `category`, `title`, `why_it_matters`, `what_to_do_next`, `confidence`, `confidence_note`, the extracted date/time fields, `linked_class_name`, `match_confidence`, `seat_count`/`seats_unclear`, and `link_url`. It never computes `urgency_score`, `consequence_weight`, or `priority_score` (a generated column), and it never decides `clashes`/`free_slots` rows.
+- **Claude's output is untrusted input**, validated twice: once by `client.messages.parse()` against the Zod schema in `lib/ai/extraction-schema.ts` (which mirrors `announcements` exactly — see `docs/ai-contracts.md` §3), and again by `lib/ingestion/map-to-announcement.ts`'s pure transform before the row is inserted.
+- **None of the deterministic engine exists yet**: clash detection (class-vs-class, class-vs-event, event-vs-event interval overlap), free-slot matching, deduplication ("Confirmed by N sources"), the priority formula, and the time-decay cron are all still just comments/notes in `supabase/schema.sql` and `docs/data-model.md` §5. `lib/ingestion/ingest.ts` currently inserts a new `announcements` row per extracted item unconditionally — no dedup check yet.
 
-- **AI (Gemini 1.5 Flash via a Next.js Server Action) is only allowed to:** classify text into the fixed 9-category taxonomy, extract entities (verbatim, `null` if absent — never fabricated), assign a `confidence_state` (`clear` / `partially_clear` / `unclear`), and generate the one-sentence `why_it_matters` / `what_to_do_next` strings.
-- **Everything else is plain, deterministic TypeScript**, not AI: clash detection (class-vs-class, class-vs-event, event-vs-event via interval overlap), free-slot matching after a cancellation, deduplication/clustering ("Confirmed by N sources"), the Source Trust Hierarchy and contradiction detection (never silently overwrite conflicting fields — record them in `contradictions`), the priority formula (`Urgency(Δt) × Consequence(tier)`), and the "what changed since `last_seen_at`" diff.
-- **AI output is untrusted input.** Every response from the model must pass through the Zod schema in `docs/ai-contracts.md` (`ExtractedAnnouncementSchema`) before it reaches business logic or the database.
-- Zero-fabrication rule applies to dates, times, rooms, seat counts, links, course/section codes, and registration status — if it's not explicitly stated in the source text, the field must be `null` (or `seat_count_unclear: true` for seats), never guessed.
+## The one working pipeline
+
+`lib/ingestion/ingest.ts` (`ingestRawText`, a Server Action) is the real, tested path: raw pasted text → insert into `messages` (via the service-role client) → `lib/ai/extract.ts` calls Claude → Zod-validated → one `announcements` + `announcement_sources` row per extracted item. `app/(dev)/ingest-test/page.tsx` exercises it manually at `/ingest-test`.
+
+**That dev route is a temporary, unauthenticated harness — delete it or gate it behind an admin check before this app is reachable by anyone but developers.** It calls a Server Action that writes through the service-role client with no auth check of its own, and `middleware.ts` doesn't protect `/ingest-test` (it only matches `/student/*` and `/admin/*`).
 
 ## Route tree & persona isolation
 
-Student and Admin are **completely segregated** — separate route groups, separate layouts, separate RLS policies, never a shared shell:
-
 ```
 app/
-├── (public)/page.tsx
-├── (auth)/login, student/login, admin/login
-├── (student)/dashboard, timetable, communities   # layout.tsx = PWA shell + offline banner
-└── (admin)/dashboard, submit/class, submit/society, history  # layout.tsx = scoped admin shell
+├── (public)/page.tsx                    # "/" — public landing
+├── (auth)/
+│   ├── login/page.tsx                   # "/login" — role selector
+│   ├── student/login/page.tsx           # "/student/login"
+│   ├── admin/login/page.tsx             # "/admin/login"
+│   └── login-form.tsx                   # shared client form (not a route)
+├── (dev)/ingest-test/page.tsx           # "/ingest-test" — TEMPORARY, see above
+├── student/                             # REAL folder — see note below
+│   ├── layout.tsx                       # nav + sign-out, force-dynamic
+│   ├── dashboard/, timetable/, communities/page.tsx   # all placeholders
+├── admin/                               # REAL folder — see note below
+│   ├── layout.tsx                       # nav + sign-out, force-dynamic
+│   └── dashboard/, submit/class/, submit/society/, history/page.tsx  # all placeholders
+├── layout.tsx, globals.css, register-service-worker.tsx, sign-out-button.tsx
 ```
 
-Secondary features live as drawers/modals inside `components/`, not as separate routes: `StudentIngestionDrawer`, `TraceToSourceDrawer`, `ContradictionCallout`, `OCRUploadModal` (Phase 2), `TimeTravelControl`.
+**`student/` and `admin/` are real path segments, not `(student)`/`(admin)` route groups.** `docs/architecture.md`'s original route-tree diagram wrote them as groups, but a parenthesized segment is stripped from the URL — `(student)/dashboard/page.tsx` and `(admin)/dashboard/page.tsx` both resolved to `/dashboard` and collided (caught by `next build`, not `tsc`). They need to be real folders both because the URLs must actually start with `/student`/`/admin` (that's what `middleware.ts` pattern-matches on) and because the dashboards need distinct URLs from each other. `(auth)`, `(public)`, and `(dev)` are legitimately route groups — those are cases where the group name should *not* appear in the URL.
 
-Middleware enforces role checks from the JWT (`users.role`): students hitting `/admin/*` get HTTP 403; unauthenticated users are redirected to `/login`. Admin accounts are **manually provisioned** in Supabase (no public admin signup) with `scoped_department` / `scoped_section` / `scoped_society`.
+`middleware.ts` (via `lib/supabase/middleware.ts`) refreshes the Supabase session on every request and enforces role separation from `profiles.role`: unauthenticated → redirect to `/login`; wrong role on `/student/*` or `/admin/*` → HTTP 403. `/student/login` and `/admin/login` are explicitly excluded from that check (they share the URL prefix with the protected dashboards but must stay reachable while signed out).
+
+Admin accounts are **manually provisioned** — there's no signup flow for the `admin` role; `handle_new_user()` in `supabase/schema.sql` defaults every new signup to `role = 'student'`.
 
 ## Data & privacy model (Supabase/Postgres)
 
-- Every table has RLS enabled; see `docs/data-model.md` §2 for exact policies. The one that matters most: **admins must never be able to read `raw_messages`** (students' pasted chat dumps) under any circumstances, even via direct API calls — this is enforced at the RLS level, not just hidden in the UI.
-- `announcements.lifecycle_status` (`ingested → parsed → classified → needs_review → published → superseded → archived`) — `needs_review` is an **automated** state for incomplete/contradictory data, not a human moderation queue. There is no admin approval step in the MVP; flagged items publish directly with visible warning badges.
-- `announcements.trust_tier` implements the Source Trust Hierarchy: `verified_admin` > `multi_source` > `single_source` > `unattributed`. Higher tier wins display precedence but never deletes/hides the conflicting value — that goes in `contradictions`.
-- Offline/PWA caching may only ever cache the app shell and sanitized structured `announcements` — raw message text must never be cached in localStorage/CacheStorage.
-- `student_engagements.status` (`interested` / `registered` / `not_interested`) gates clash notifications (only fires for `interested`/`registered` events) and suppresses feed visibility for `not_interested`, but must never delete the announcement or its audit trail.
-
-## Explicitly out of scope (do not build without asking)
-
-Phase 2 — deferred but committed (build the seams for these, not the features): PWA Web Share Target, AI OCR timetable image/PDF parsing, enhanced offline structured-data sync, automated time-decay cron re-ranking.
-
-Stretch: WhatsApp Business Cloud API webhook bot.
-
-Confirmed **not included** at all: open-ended conversational chatbot, admin moderation/approval queue, calendar (.ics) export, demo scenario switcher, haptic feedback, any role beyond Student/Admin (no Faculty/Dean/Superadmin).
+See `docs/data-model.md` for the full walkthrough; the two things every change needs to respect:
+- **`messages` has a SELECT policy but no INSERT policy for `authenticated`** — same for `announcements`' full write path, `announcement_sources`, `contradictions`, `clashes`, and `free_slots`. Any code writing to these must go through `lib/supabase/admin.ts` (service-role, bypasses RLS) on the server — never the anon/browser client. `lib/supabase/client.ts` (browser) and `lib/supabase/server.ts` (request-scoped, respects RLS) are for everything a signed-in user should only see/touch as themselves: `timetable_entries`, `student_announcement_status`, `clashes`/`free_slots` reads, `last_seen`, their own `profiles` row.
+- **`admin_scopes` has RLS enabled but no policy defined yet** — don't build a client-side feature assuming an admin can read their own scope directly; it needs a server-side/service-role read (or a new policy) first.

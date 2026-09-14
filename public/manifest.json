@@ -1,0 +1,17 @@
+{
+  "name": "Campus Assistant",
+  "short_name": "Campus Assistant",
+  "description": "What actually matters to me — a campus announcement assistant.",
+  "start_url": "/login",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#2f5fdb",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
