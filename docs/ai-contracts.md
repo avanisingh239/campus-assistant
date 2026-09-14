@@ -2,12 +2,12 @@
 ## Campus Announcement Assistant: "What Actually Matters to Me?"
 
 **Authoritative Source:** `docs/product-spec.md`, `docs/architecture.md` & `supabase/schema.sql`
-**AI Provider:** Claude API (Anthropic) — see `lib/ai/claude.ts`
+**AI Provider:** Google Gemini (`@google/genai`) — see `lib/ai/gemini.ts`
 **AI Role:** Information Extraction, Categorization, and Confidence Assessment Engine
 **Last Updated:** September 14, 2026
 
 > [!IMPORTANT]
-> This document previously specified Google Gemini 1.5 Flash as the extraction model, and a field set (`course_code`, `faculty_name`, `target_section`, `location_room`, `registration_link`, `confidence_state: 'partially_clear'`, `consequence_tier`) that doesn't match any column in the live database. Both are now corrected: **the extraction model is the Claude API**, and **the schema below matches `supabase/schema.sql`'s `announcements` table exactly** — see the callout in §3 for what changed and why.
+> This document has gone through two provider changes. It originally specified Google Gemini 1.5 Flash with a field set (`course_code`, `faculty_name`, `target_section`, `location_room`, `registration_link`, `confidence_state: 'partially_clear'`, `consequence_tier`) that doesn't match any column in the live database — that field set was corrected in §3 (see its callout for exactly what changed) when the provider was briefly switched to the Claude API. **The provider is now Gemini again** — a deliberate, cost-driven choice to stay on Gemini's free tier during a hackathon (see `CLAUDE.md`), not a reversion of the §3 field-set fix, which still stands. The Zod schema in §3 is unchanged by either provider swap; only §4 (the model call itself) differs.
 
 ---
 
@@ -92,11 +92,15 @@ export const ExtractedAnnouncementSchema = z.object({
 
 ---
 
-## 4. Contract 1: Raw Announcement Stream Extraction (Claude API)
+## 4. Contract 1: Raw Announcement Stream Extraction (Google Gemini)
 
 ### 4.1 Model & call shape
 
-Implemented in `lib/ai/extract.ts` via `client.messages.parse()` with `zodOutputFormat(ExtractionBatchSchema)` (Anthropic TypeScript SDK) — the SDK validates Claude's JSON against the Zod schema before your code ever sees it; `lib/ingestion/ingest.ts` re-validates each item before insert as a second, independent guard rail (defense in depth, not redundant plumbing — the two live in different modules and either one failing closed is enough to stop bad data).
+Implemented in `lib/ai/extract.ts` via `client.models.generateContent()` (the `@google/genai` SDK, model `gemini-2.5-flash` — see `lib/ai/gemini.ts`), with `config.responseMimeType: "application/json"` and `config.responseJsonSchema` set to a JSON Schema generated from `ExtractionBatchSchema` via Zod's own `z.toJSONSchema()`.
+
+**This is a best-effort schema hint, not a guarantee** — Gemini's `responseJsonSchema` only honors a subset of JSON Schema (no `minLength`/`maxLength`/`pattern`; see the SDK's own type comments for the exact supported-keyword list). The response is still parsed as JSON and re-validated against the full `ExtractionBatchSchema` in `lib/ai/extract.ts` before it's returned, and `lib/ingestion/ingest.ts` re-validates each item again before insert — that Zod validation, not Gemini's schema support, is the actual safety net (same defense-in-depth principle as before, just with the schema-conformance work shifted more onto the Zod layer since the model-side guarantee is weaker than the Claude API's `messages.parse()` gave).
+
+**Rate limits:** Gemini's free tier caps requests at roughly 10/minute. `lib/ai/extract.ts` retries a 429 or 503 response up to twice with exponential backoff (1s, 2s) before throwing a `RateLimitError` whose message is meant to be shown to the user directly (see `app/(dev)/ingest-test/page.tsx`).
 
 ### 4.2 System Prompt
 ```text
@@ -118,11 +122,14 @@ STRICT RULES:
 8. If the message names a class, course, or section that might match a student's timetable, set 'linked_class_name'
    to that name verbatim and 'match_confidence' to your confidence (0-1) that it identifies a specific class —
    do not guess a class that isn't named or clearly implied.
-9. Output MUST strictly match the requested JSON schema.
+9. Output MUST strictly match the requested JSON schema. Respond with JSON only — no prose, no markdown fences.
+10. A single raw_text payload may contain many forwarded messages concatenated together — extract one
+    announcement per distinct notice, not one per input message; unrelated chatter and system lines produce no
+    announcement at all.
 ```
 
 ### 4.3 Output shape
-The batch response is `{ announcements: ExtractedAnnouncement[] }`, where each item matches §3's `ExtractedAnnouncementSchema`. See `lib/ai/extraction-schema.ts` for the exact Zod definition and `lib/ai/extract.ts` for the Claude call.
+The batch response is `{ announcements: ExtractedAnnouncement[] }`, where each item matches §3's `ExtractedAnnouncementSchema`. See `lib/ai/extraction-schema.ts` for the exact Zod definition and `lib/ai/extract.ts` for the Gemini call.
 
 ---
 
@@ -140,9 +147,9 @@ The ingestion pipeline surfaces standardized user-visible states:
 | `needs_clarification` | *"1 message could not be categorized. Saved to Uncategorized."* | Renders catch-all card with manual edit option. |
 | `duplicate_input` | *"Notice already tracked: Confirmed by 1 additional source."* | Links a new `announcement_sources` row to the existing announcement instead of creating a duplicate card. |
 | `unsupported_format` | *"Unsupported file type. Please upload a plain text (.txt) WhatsApp export."* | Rejects upload gracefully. |
-| `failed` | *"Extraction failed. Please check network connection and try again."* | Preserves raw text in box for one-click retry. |
+| `failed` | *"Extraction failed. Please check network connection and try again."* / *"Gemini's free tier only allows a few requests per minute — please wait a moment and try again."* | Preserves raw text in box for one-click retry. |
 
-The scaffolded pipeline (`lib/ingestion/ingest.ts`) currently implements `empty`/`ready` → `processing` → `successfully_parsed`/`partially_parsed`/`failed`. Deduplication (`duplicate_input`) and the `needs_clarification` catch-all UI are not wired yet — see `docs/data-model.md` §5 for what deduplication needs (it's a deterministic-layer feature, not an AI one).
+The scaffolded pipeline (`lib/ingestion/ingest.ts`) currently implements `empty`/`ready` → `processing` → `successfully_parsed`/`partially_parsed`/`failed`. Deduplication (`duplicate_input`) and the `needs_clarification` catch-all UI are not wired yet — see `docs/data-model.md` §5 for what deduplication needs (it's a deterministic-layer feature, not an AI one). The second `failed` message above is Gemini-specific (`RateLimitError` from `lib/ai/extract.ts`, after retries are exhausted) — worth a distinct message since it's an expected, recoverable condition on the free tier, not a bug.
 
 ---
 

@@ -12,23 +12,23 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@google/genai": "2.22.0",
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.116.0",
     "next": "15.5.25",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "@supabase/supabase-js": "2.116.0",
-    "@supabase/ssr": "0.12.7",
-    "@anthropic-ai/sdk": "0.125.0",
-    "zod": "4.6.5",
-    "server-only": "0.0.1"
+    "server-only": "0.0.1",
+    "zod": "4.6.5"
   },
   "devDependencies": {
-    "typescript": "5.9.3",
+    "@eslint/eslintrc": "3.3.7",
     "@types/node": "22.20.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "eslint": "9.39.5",
     "eslint-config-next": "15.5.25",
-    "@eslint/eslintrc": "3.3.7",
+    "typescript": "5.9.3",
     "vitest": "3.2.7"
   }
 }

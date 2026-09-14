@@ -1,6 +1,7 @@
 import "server-only";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { CLAUDE_MODEL, getClaudeClient } from "./claude";
+import { z } from "zod";
+import { ApiError } from "@google/genai";
+import { GEMINI_MODEL, getGeminiClient } from "./gemini";
 import {
   ExtractionBatchSchema,
   type ExtractedAnnouncement,
@@ -25,49 +26,114 @@ STRICT RULES:
 8. If the message names a class, course, or section that might match a student's timetable, set 'linked_class_name'
    to that name verbatim and 'match_confidence' to your confidence (0-1) that it identifies a specific class —
    do not guess a class that isn't named or clearly implied.
-9. Output MUST strictly match the requested JSON schema.
+9. Output MUST strictly match the requested JSON schema. Respond with JSON only — no prose, no markdown fences.
 10. A single raw_text payload may contain many forwarded messages concatenated together — extract one
     announcement per distinct notice, not one per input message; unrelated chatter and system lines produce no
     announcement at all.`;
 
+/**
+ * Best-effort JSON Schema for Gemini's `responseJsonSchema` config, derived
+ * from the same Zod schema `lib/ingestion/ingest.ts` validates against —
+ * generated once at module load, not per request.
+ *
+ * "Best-effort" because Gemini's `responseJsonSchema` only honors a subset
+ * of JSON Schema (no `minLength`/`maxLength`/`pattern` — see the SDK's own
+ * type docs for the full supported-keyword list). The extra keywords Zod
+ * emits are harmless no-ops for Gemini, not errors. Either way, the Zod
+ * schema itself is re-applied to the parsed response below (and again in
+ * lib/ingestion/map-to-announcement.ts) — that's the actual safety net,
+ * not this schema hint.
+ */
+const RESPONSE_JSON_SCHEMA = z.toJSONSchema(ExtractionBatchSchema);
+
 export class ExtractionError extends Error {}
 
+/** Thrown after retries are exhausted on a 429/503 from Gemini's free tier. */
+export class RateLimitError extends ExtractionError {}
+
+const MAX_ATTEMPTS = 3;
+const BASE_DELAY_MS = 1000;
+
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status === 503;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
- * Calls the Claude API to extract structured announcements from a raw pasted
- * text payload, validated against ExtractionBatchSchema.
+ * Calls the Gemini API to extract structured announcements from a raw
+ * pasted text payload, validated against ExtractionBatchSchema.
  *
- * `client.messages.parse()` + `zodOutputFormat()` handles the JSON-schema
- * plumbing and validates the response before it's returned — see
- * typescript/claude-api/tool-use.md ("Structured Outputs") in the
- * claude-api skill. lib/ingestion/ingest.ts re-validates each item
- * independently before writing to the database (defense in depth).
+ * Gemini's free tier caps requests at roughly 10/minute — a 429 (or a 503,
+ * which the free tier also returns under load) gets up to MAX_ATTEMPTS-1
+ * retries with exponential backoff before giving up with a RateLimitError
+ * whose message is meant to be shown directly to the user (see
+ * app/(dev)/ingest-test/page.tsx, which surfaces any thrown Error's
+ * `.message`).
  */
 export async function extractAnnouncements(
   rawText: string,
 ): Promise<ExtractedAnnouncement[]> {
-  const client = getClaudeClient();
+  const client = getGeminiClient();
 
-  const response = await client.messages.parse({
-    model: CLAUDE_MODEL,
-    max_tokens: 16000,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: rawText }],
-    output_config: {
-      format: zodOutputFormat(ExtractionBatchSchema),
-    },
-  });
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await client.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: rawText,
+        config: {
+          systemInstruction: SYSTEM_PROMPT,
+          responseMimeType: "application/json",
+          responseJsonSchema: RESPONSE_JSON_SCHEMA,
+        },
+      });
 
-  if (response.stop_reason === "refusal") {
-    throw new ExtractionError(
-      "Claude declined to process this input. Try rephrasing or removing sensitive content.",
-    );
+      if (!response.text) {
+        const blockReason = response.promptFeedback?.blockReason;
+        throw new ExtractionError(
+          blockReason
+            ? `Gemini declined to process this input (${blockReason}). Try rephrasing or removing sensitive content.`
+            : "Gemini returned no output for this input.",
+        );
+      }
+
+      let parsedJson: unknown;
+      try {
+        parsedJson = JSON.parse(response.text);
+      } catch {
+        throw new ExtractionError("Gemini's response was not valid JSON.");
+      }
+
+      const result = ExtractionBatchSchema.safeParse(parsedJson);
+      if (!result.success) {
+        throw new ExtractionError(
+          `Gemini's response did not match the expected extraction schema: ${result.error.message}`,
+        );
+      }
+
+      return result.data.announcements;
+    } catch (err) {
+      const retryable = err instanceof ApiError && isRetryableStatus(err.status);
+
+      if (retryable && attempt < MAX_ATTEMPTS) {
+        await sleep(BASE_DELAY_MS * 2 ** (attempt - 1));
+        continue;
+      }
+
+      if (retryable) {
+        throw new RateLimitError(
+          "Gemini's free tier only allows a few requests per minute — please wait a moment and try again.",
+        );
+      }
+
+      if (err instanceof ExtractionError) throw err;
+      throw new ExtractionError(`Extraction failed: ${(err as Error).message}`);
+    }
   }
 
-  if (!response.parsed_output) {
-    throw new ExtractionError(
-      "Claude's response did not match the expected extraction schema.",
-    );
-  }
-
-  return response.parsed_output.announcements;
+  // Unreachable — every loop iteration either returns or throws — but kept
+  // so TypeScript can see every path returns/throws.
+  throw new ExtractionError("Extraction failed after retries.");
 }

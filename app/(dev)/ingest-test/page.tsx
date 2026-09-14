@@ -46,9 +46,9 @@ export default function IngestTestPage() {
       <p className="muted">
         Not part of the product UI. Paste some forwarded messages below to
         run the real pipeline: stores a <code>messages</code> row, calls
-        Claude for extraction, validates the response, and inserts
+        Gemini for extraction, validates the response, and inserts
         <code> announcements</code> + <code>announcement_sources</code>{" "}
-        rows. Requires ANTHROPIC_API_KEY, NEXT_PUBLIC_SUPABASE_URL, and
+        rows. Requires GEMINI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, and
         SUPABASE_SERVICE_ROLE_KEY in your environment.
       </p>
       <form className="card" onSubmit={handleSubmit}>
