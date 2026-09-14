@@ -5,14 +5,14 @@ import Anthropic from "@anthropic-ai/sdk";
  * Claude API client for the extraction pipeline (docs/ai-contracts.md).
  * Resolves ANTHROPIC_API_KEY from the environment — never hardcode a key.
  *
- * Model: claude-opus-5, per this project's model-choice default. Extraction
- * is a classification-shaped workload that could run cheaper on a smaller
- * model or at lower `output_config.effort`, but the zero-fabrication
- * requirement in docs/ai-contracts.md §1 makes correctness the priority
- * here — treat switching model/effort as a deliberate, measured decision
- * (see the claude-api skill's cost-optimization guide), not a default.
+ * Model: claude-haiku-4-5-20251001. Extraction against a fixed 9-category
+ * taxonomy and a strict Zod schema is a classification-shaped workload —
+ * Haiku 4.5 handles it well at roughly 1/5 the cost of claude-opus-5. If the
+ * zero-fabrication rule in docs/ai-contracts.md §1 turns out to need more
+ * model capability in practice (missed fields, invented values), that's a
+ * measured decision to revisit, not a default to size up preemptively.
  */
-export const CLAUDE_MODEL = "claude-opus-5";
+export const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 
 let client: Anthropic | null = null;
 
