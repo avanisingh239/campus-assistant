@@ -96,7 +96,7 @@ export const ExtractedAnnouncementSchema = z.object({
 
 ### 4.1 Model & call shape
 
-Implemented in `lib/ai/extract.ts` via `client.models.generateContent()` (the `@google/genai` SDK, model `gemini-2.5-flash` — see `lib/ai/gemini.ts`), with `config.responseMimeType: "application/json"` and `config.responseJsonSchema` set to a JSON Schema generated from `ExtractionBatchSchema` via Zod's own `z.toJSONSchema()`.
+Implemented in `lib/ai/extract.ts` via `client.models.generateContent()` (the `@google/genai` SDK, model `gemini-3.6-flash` — see `lib/ai/gemini.ts` for why it's not `gemini-2.5-flash`, the SDK's own README example model, which Google retired for new API keys shortly after this pipeline was first wired up), with `config.responseMimeType: "application/json"` and `config.responseJsonSchema` set to a JSON Schema generated from `ExtractionBatchSchema` via Zod's own `z.toJSONSchema()`.
 
 **This is a best-effort schema hint, not a guarantee** — Gemini's `responseJsonSchema` only honors a subset of JSON Schema (no `minLength`/`maxLength`/`pattern`; see the SDK's own type comments for the exact supported-keyword list). The response is still parsed as JSON and re-validated against the full `ExtractionBatchSchema` in `lib/ai/extract.ts` before it's returned, and `lib/ingestion/ingest.ts` re-validates each item again before insert — that Zod validation, not Gemini's schema support, is the actual safety net (same defense-in-depth principle as before, just with the schema-conformance work shifted more onto the Zod layer since the model-side guarantee is weaker than the Claude API's `messages.parse()` gave).
 

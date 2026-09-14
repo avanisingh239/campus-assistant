@@ -170,7 +170,7 @@ Data privacy is guaranteed at the database engine level through Supabase RLS:
 
 * **MVP Architecture:**
   * Ingestion: Client-side Bulk Paste & Chat Export parsing.
-  * AI: Server Action calling the Google Gemini API (`gemini-2.5-flash`, free tier — see CLAUDE.md) with best-effort JSON schema-constrained output, backstopped by Zod validation.
+  * AI: Server Action calling the Google Gemini API (`gemini-3.6-flash`, free tier — see CLAUDE.md) with best-effort JSON schema-constrained output, backstopped by Zod validation.
   * Logic: In-memory/Node.js deterministic engines for all 3 clash types, free slots, and deduplication.
   * Database: Supabase PostgreSQL with core RLS policies enforcing raw message privacy.
 * **Phase 2 Architecture — Deferred but Committed:**
