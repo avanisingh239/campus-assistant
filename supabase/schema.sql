@@ -253,9 +253,67 @@ create policy "update own profile" on profiles for update using (auth.uid() = id
 create policy "student manages own timetable" on timetable_entries
   for all using (auth.uid() = student_id);
 
--- announcements: readable by every authenticated student (shared feed)
-create policy "announcements readable by authenticated users" on announcements
-  for select using (auth.role() = 'authenticated');
+-- announcements: scoped to the viewing student's own class, not a fully
+-- global feed — see CLAUDE.md's §Cross-student data isolation for the real
+-- bug this fixes (a second real student account could see every other
+-- class's cancellation/deadline announcements) and why the fix lives here,
+-- in the policy itself, rather than as a filter added to each page's query:
+-- RLS is enforced at the database level regardless of what query code
+-- does, so this one policy change is what actually makes app/student/
+-- dashboard, dont-miss-this, AND communities all correctly scoped — none
+-- of their queries needed to change.
+--
+-- A student sees an announcement if EITHER:
+--   - its category is inherently cross-class ('society_link', 'event',
+--     'opportunity', 'registered_update' — see below for why exactly
+--     these four, not just society_link); OR
+--   - the message it was extracted from has a `source_group_name` that
+--     matches the viewing student's own `profiles.class_name` (case/
+--     whitespace-insensitive — two independently free-typed fields
+--     matching by exact case would be a near-certain real-world footgun).
+-- `deadline`/`cancellation` (the task's own explicit examples of what must
+-- NOT be shared) and the catch-all `fyi`/`duplicate`/`uncategorized` stay
+-- class-scoped by default — administrative/schedule data specific to one
+-- class, not campus-wide by nature.
+--
+-- Why 'event'/'opportunity'/'registered_update' join 'society_link' as
+-- cross-class, beyond the task's one explicit example: they're exactly
+-- `lib/deterministic/clashes.ts`'s own `CLASH_ELIGIBLE_CATEGORIES` — the
+-- categories the deterministic engine already treats as matchable to ANY
+-- student's timetable regardless of which class reported them (a
+-- cancellation opens a free slot that gets matched against opportunities
+-- by time-fit alone, never by class; docs/product-spec.md's own problem
+-- statement frames "rare extracurricular opportunities are missed" as
+-- something explicitly cross-class). Scoping these three by class as well
+-- would have silently broken that matching: `lib/deterministic/sync.ts`
+-- runs through the service-role client and bypasses RLS entirely to do
+-- the matching, so a `free_slots.matched_announcement_id` could end up
+-- pointing at an announcement from a different class than the student who
+-- has the free slot — the RLS-respecting reads in
+-- app/student/dashboard/page.tsx and app/student/timetable/page.tsx that
+-- resolve that id back into a title would then come back empty. Keeping
+-- these four categories campus-wide keeps that path (and the "Don't Miss
+-- This" feed's whole reason for existing) internally consistent.
+--
+-- The subquery below is safe under RLS composition: `announcement_sources`
+-- and `messages` both already have a blanket "readable by authenticated
+-- users" policy (no restriction to work around), and the `profiles` join
+-- only ever touches the querying user's own row (`p.id = auth.uid()`),
+-- which is exactly what "read own profile" already allows.
+create policy "announcements readable by own class or shared category" on announcements
+  for select using (
+    category in ('society_link', 'event', 'opportunity', 'registered_update')
+    or exists (
+      select 1
+      from announcement_sources asrc
+      join messages m on m.id = asrc.message_id
+      join profiles p on p.id = auth.uid()
+      where asrc.announcement_id = announcements.id
+        and m.source_group_name is not null
+        and p.class_name is not null
+        and lower(trim(m.source_group_name)) = lower(trim(p.class_name))
+    )
+  );
 
 -- announcements: only admins can insert/update, and only within their assigned scope
 create policy "admins insert within scope" on announcements
@@ -299,6 +357,37 @@ create policy "announcement_sources readable by authenticated users" on announce
 
 create policy "contradictions readable by authenticated users" on contradictions
   for select using (auth.role() = 'authenticated');
+
+-- ============================================================
+-- ADDED — Cross-student data isolation fix (see CLAUDE.md's §Cross-student
+-- data isolation). Replaces the old blanket "announcements readable by
+-- authenticated users" policy above with a class-scoped one. This is a
+-- POLICY CHANGE on an already-applied policy, not a fresh create — the
+-- live Supabase project needs the drop-then-create below run against it
+-- directly (Postgres has no "create or replace policy"):
+--
+--   drop policy "announcements readable by authenticated users" on announcements;
+--
+--   create policy "announcements readable by own class or shared category" on announcements
+--     for select using (
+--       category in ('society_link', 'event', 'opportunity', 'registered_update')
+--       or exists (
+--         select 1
+--         from announcement_sources asrc
+--         join messages m on m.id = asrc.message_id
+--         join profiles p on p.id = auth.uid()
+--         where asrc.announcement_id = announcements.id
+--           and m.source_group_name is not null
+--           and p.class_name is not null
+--           and lower(trim(m.source_group_name)) = lower(trim(p.class_name))
+--       )
+--     );
+--
+-- Until this runs, the live project still has the old global policy in
+-- place — every student can still see every other class's announcements,
+-- exactly the bug this fix addresses — even though this file's own
+-- `create policy` above already shows the corrected, intended state.
+-- ============================================================
 
 
 -- ============================================================
