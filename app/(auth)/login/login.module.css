@@ -1,0 +1,191 @@
+/*
+ * /login-specific layout. Card/pin/button/field shapes come from
+ * components/ui.module.css; this file only holds what's specific to this
+ * screen's layout (centering, the two-tile role grid, the form shell).
+ */
+
+.wrap {
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 48px 24px 60px;
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  margin-bottom: 36px;
+}
+.logoMark {
+  width: 52px;
+  height: 52px;
+}
+.appName {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  margin: 0;
+  color: #ffffff;
+}
+.tagline {
+  font-size: 14px;
+  color: #bfe0c4;
+  font-weight: 500;
+  margin: 0;
+}
+
+.roleGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 480px) {
+  .roleGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.roleTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  padding: 8px;
+  width: 100%;
+}
+.roleIconChip {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--sage);
+  color: var(--forest-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s var(--bounce);
+}
+.roleTile:hover .roleIconChip {
+  transform: rotate(-6deg) scale(1.08);
+}
+.roleIconChip svg {
+  width: 28px;
+  height: 28px;
+}
+.roleLabel {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--forest);
+}
+.roleSub {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: -6px 0 0;
+}
+
+.formHeading {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--forest);
+  text-align: center;
+}
+.formSub {
+  font-size: 13px;
+  color: var(--ink-soft);
+  text-align: center;
+  margin: 0 0 20px;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 18px;
+}
+.backLink:hover {
+  text-decoration: underline;
+}
+
+/* Used when the back link sits below centered content (the restricted
+   state) instead of above a left-aligned form. */
+.backLinkCentered {
+  justify-content: center;
+  width: 100%;
+  margin-top: 18px;
+  margin-bottom: 0;
+}
+
+.formError {
+  background: var(--warn-bg);
+  border: 2px dashed var(--warn-line);
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 12.5px;
+  color: #7a5a0f;
+  margin-bottom: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.toggleRow {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.toggleLink {
+  background: none;
+  border: none;
+  color: var(--forest);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: inherit;
+}
+
+.restricted {
+  text-align: center;
+}
+.restrictedIcon {
+  width: 48px;
+  height: 48px;
+  color: var(--urgent);
+  margin: 0 auto 12px;
+}
+.restrictedTitle {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--urgent);
+  margin: 0 0 8px;
+}
+.restrictedText {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0 0 20px;
+}

@@ -70,9 +70,7 @@ app/
 ├── (public)/
 │   └── page.tsx                         # Public Landing & Overview
 ├── (auth)/
-│   ├── login/page.tsx                   # Role Selection Entry (/login)
-│   ├── student/login/page.tsx           # Student Authentication (/student/login)
-│   └── admin/login/page.tsx             # Admin Authentication (/admin/login)
+│   └── login/page.tsx                   # Role Selection + Student/Admin Auth (/login, one route)
 ├── (student)/
 │   ├── layout.tsx                       # Student Shell (PWA Nav, Offline Banner)
 │   ├── dashboard/page.tsx               # Student Dashboard (Diff, Feeds, Lanes)
@@ -86,6 +84,8 @@ app/
     │   └── society/page.tsx             # Society Coordinator Event Form
     └── history/page.tsx                 # Admin's Own Submission Log
 ```
+
+`(student)`/`(admin)` above are route groups in this original diagram — as built, they're real `student/`/`admin/` folders instead (a parenthesized segment doesn't appear in the URL, and both groups resolved to the same `/dashboard` route otherwise); see CLAUDE.md's §Route tree for the corrected tree. `/login` is also consolidated into one route with internal UI state rather than three (`/login`, `/student/login`, `/admin/login`) — see CLAUDE.md's §Login / role selection.
 
 ### Contextual Drawers & Modals (Component Layer)
 To prevent disorientation, the following live inside `components/` as modals or slide-overs rather than separate pages:
@@ -108,7 +108,7 @@ This system enforces an absolute separation:
 * **Action Generation:** Synthesizes a 1-sentence "Why It Matters" (consequence) and a 1-verb "What To Do Next" directive based strictly on context.
 
 > [!IMPORTANT]
-> **AI Output is Untrusted Input:** The JSON returned by Gemini/Ollama is treated as untrusted user input. It is passed through a strict Zod runtime schema validation before being processed by backend business logic.
+> **AI Output is Untrusted Input:** The JSON returned by the Gemini API is treated as untrusted user input. It is passed through a strict Zod runtime schema validation before being processed by backend business logic — this holds regardless of which model provider is behind the call; see `docs/ai-contracts.md` §4 for why it matters even more with Gemini, whose structured-output schema support is weaker than the Claude API's.
 
 ### 3.2 Deterministic Code Responsibilities (Mathematical Certainty)
 * **Clash Detection:** Pure interval comparison against confirmed timetable entries, covering all three clash types:
@@ -170,7 +170,7 @@ Data privacy is guaranteed at the database engine level through Supabase RLS:
 
 * **MVP Architecture:**
   * Ingestion: Client-side Bulk Paste & Chat Export parsing.
-  * AI: Server Action calling Google Gemini 1.5 Flash with structured JSON schema output.
+  * AI: Server Action calling the Google Gemini API (`gemini-3.6-flash`, free tier — see CLAUDE.md) with best-effort JSON schema-constrained output, backstopped by Zod validation.
   * Logic: In-memory/Node.js deterministic engines for all 3 clash types, free slots, and deduplication.
   * Database: Supabase PostgreSQL with core RLS policies enforcing raw message privacy.
 * **Phase 2 Architecture — Deferred but Committed:**

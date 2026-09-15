@@ -1,0 +1,188 @@
+/*
+ * Shared visual primitives, ported from the Student Dashboard prototype
+ * (dashboard.html) so screens built after the dashboard — starting with
+ * /login — reuse the same tokens/shapes instead of duplicating them.
+ * `.site`/`.bgSym`/`.s1`-`.s4`/`float1` are a verbatim move out of
+ * app/student/dashboard/dashboard.module.css (see CanvasBackground); the
+ * rest (pinCard, button, field) are new, generalized from the same design
+ * language (mint card + forest-deep border + pin dot, gold pill actions).
+ */
+
+.site {
+  background:
+    radial-gradient(circle at 10% 10%, rgba(109, 151, 115, 0.16) 0, transparent 220px),
+    radial-gradient(circle at 90% 6%, rgba(255, 186, 0, 0.09) 0, transparent 260px),
+    radial-gradient(circle at 70% 60%, rgba(109, 151, 115, 0.12) 0, transparent 260px),
+    radial-gradient(circle at 15% 80%, rgba(255, 186, 0, 0.07) 0, transparent 220px),
+    var(--forest);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.bgSym {
+  position: absolute;
+  opacity: 0.12;
+  color: var(--sage-strong);
+  pointer-events: none;
+  animation: float1 7s ease-in-out infinite;
+  z-index: 0;
+}
+.bgSym svg {
+  width: 100%;
+  height: 100%;
+}
+.s1 {
+  top: 260px;
+  left: 4%;
+  width: 26px;
+  height: 26px;
+  animation-duration: 6s;
+}
+.s2 {
+  top: 180px;
+  right: 6%;
+  width: 30px;
+  height: 30px;
+  color: var(--gold);
+  opacity: 0.16;
+  animation-duration: 8s;
+  animation-delay: 1s;
+}
+.s3 {
+  bottom: 220px;
+  left: 8%;
+  width: 24px;
+  height: 24px;
+  animation-duration: 7.5s;
+  animation-delay: 0.4s;
+}
+.s4 {
+  bottom: 140px;
+  right: 5%;
+  width: 26px;
+  height: 26px;
+  color: var(--gold);
+  opacity: 0.14;
+  animation-duration: 6.5s;
+  animation-delay: 0.8s;
+}
+@keyframes float1 {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(10deg);
+  }
+}
+
+/* ===== PIN CARD ===== */
+.pinCard {
+  background: var(--mint-card);
+  border: 3px solid var(--forest-deep);
+  border-radius: 18px;
+  box-shadow: 6px 6px 0 var(--sage);
+  position: relative;
+  padding: 24px;
+}
+
+.pin {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--sage);
+  border: 2.5px solid var(--forest-deep);
+  z-index: 4;
+  box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.15);
+}
+.pin::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+/* ===== BUTTON ===== */
+.button {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 12px 20px;
+  border-radius: 20px;
+  border: 2.5px solid var(--forest-deep);
+  cursor: pointer;
+  transition:
+    transform 0.15s var(--bounce),
+    background 0.15s ease;
+  width: 100%;
+}
+.button:hover {
+  transform: translateY(-2px) scale(1.02);
+}
+.button:active {
+  transform: scale(0.96);
+}
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+.buttonPrimary {
+  background: var(--gold);
+  color: var(--forest-deep);
+}
+.buttonGhost {
+  background: transparent;
+  color: var(--mint-card);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.buttonGhost:hover {
+  border-color: var(--gold);
+}
+
+/* ===== FORM FIELD ===== */
+.field {
+  display: block;
+  margin-bottom: 16px;
+  text-align: left;
+}
+.fieldLabel {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--forest);
+  margin-bottom: 6px;
+}
+.fieldInput {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid var(--sage);
+  background: #fff;
+  color: var(--ink);
+}
+.fieldInput:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+.fieldInputError {
+  border-color: var(--urgent);
+}
+.fieldError {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--urgent);
+  font-weight: 600;
+}
