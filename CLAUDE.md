@@ -57,7 +57,9 @@ Nothing in this repo talks to a live Supabase project or the Gemini API without 
 
 ## The one working pipeline
 
-`lib/ingestion/ingest.ts` (`ingestRawText`, a Server Action) is the real, tested path: raw pasted text → insert into `messages` (via the service-role client) → `lib/ai/extract.ts` calls Gemini → Zod-validated → one `announcements` + `announcement_sources` row per extracted item. `app/(dev)/ingest-test/page.tsx` exercises it manually at `/ingest-test`.
+`lib/ingestion/ingest.ts` (`ingestRawText`, a Server Action) is the real, tested path: raw pasted text → insert into `messages` (via the service-role client) → `lib/ai/extract.ts` calls Gemini → Zod-validated → one `announcements` + `announcement_sources` row per extracted item. `app/(dev)/ingest-test/page.tsx` exercises it manually at `/ingest-test`, with a "Source group name" input (defaults to "Test Group" if left blank) alongside the raw-text box — added after testing found every `/ingest-test`-submitted message had `source_group_name: null`, which the dashboard's trace-to-source drawer correctly renders as "Unknown source" (see `app/student/dashboard/card.tsx`'s `source.source_group_name ?? "UNKNOWN SOURCE"` fallback — that's genuinely missing test data, not a display bug).
+
+`lib/ai/extract.ts`'s system prompt is built per-request by `buildSystemPrompt(now)`, not a static string — it includes a `CONTEXT` block with the extraction request's current date so Gemini can resolve relative day/time references ("tomorrow", "Friday", "next Monday") into concrete `event_date`/`deadline_at` values. Before this, the model had no anchor date at all, so any relative-only reference correctly (per its own "never guess" rule) came back `null` — this silently affected every category that uses dates, not just deadlines, until fixed. See `docs/ai-contracts.md` §1/§4.2, kept in sync with the actual prompt.
 
 Gemini's free tier is rate-limited to roughly 10 requests/minute — `extractAnnouncements()` retries a 429/503 with backoff (1s, 2s) before throwing `RateLimitError`, which `/ingest-test` surfaces as a plain error message rather than a crash.
 

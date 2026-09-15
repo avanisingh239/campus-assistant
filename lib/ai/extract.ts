@@ -7,14 +7,42 @@ import {
   type ExtractedAnnouncement,
 } from "./extraction-schema";
 
-// Contract 4.2 in docs/ai-contracts.md — keep the two in sync.
-const SYSTEM_PROMPT = `You are the extraction engine for Campus Assistant.
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/**
+ * Contract 4.2 in docs/ai-contracts.md — keep the two in sync.
+ *
+ * Takes `now` explicitly (called with `new Date()` below) rather than
+ * reading the clock itself, matching this codebase's convention elsewhere
+ * (lib/dashboard/format.ts etc.) of never reaching for Date.now() inside
+ * logic that needs to be reasoned about deterministically.
+ *
+ * Built per-request, not module-level like the old static SYSTEM_PROMPT
+ * was — a message like "submit by Friday" is otherwise unresolvable:
+ * without today's date as an anchor, Gemini has no way to turn a relative
+ * day reference into the concrete event_date/deadline_at the schema
+ * requires, and rule 3 (never fabricate) correctly makes it emit null
+ * instead of guessing. That was silently degrading every category that
+ * uses relative dates, not just deadlines — this fixes all of them at
+ * once by giving the model an anchor date to resolve against.
+ */
+function buildSystemPrompt(now: Date): string {
+  const todayIso = now.toISOString().slice(0, 10);
+  const weekday = WEEKDAYS[now.getUTCDay()];
+
+  return `You are the extraction engine for Campus Assistant.
 Your task is to analyze unstructured campus messages (e.g. from WhatsApp groups) and extract structured announcements.
 
+CONTEXT:
+Today's date is ${todayIso} (a ${weekday}). Use this to resolve relative day/time references in the text —
+"today", "tomorrow", "Friday", "next Monday", "in 3 days", etc. — into concrete event_date (YYYY-MM-DD) and
+deadline_at values. Resolving a clearly-stated relative reference this way is extraction, not guessing — rule 3
+below only forbids inventing a date the text gives no basis for at all.
+
 STRICT RULES:
-1. Extract only facts directly stated in the text.
-2. If any field (date, time, class/section match, seat count, link) is missing or unclear, output null.
-3. NEVER guess or fabricate values.
+1. Extract only facts directly stated in the text, resolving relative dates/times against today's date per CONTEXT above.
+2. If any field (date, time, class/section match, seat count, link) is missing or cannot be resolved even with today's date, output null.
+3. NEVER guess or fabricate a date or value the text gives no basis for.
 4. Categorize each announcement into exactly one primary category:
    ['deadline', 'cancellation', 'event', 'opportunity', 'registered_update', 'society_link', 'fyi', 'duplicate', 'uncategorized'].
 5. For confidence:
@@ -30,6 +58,7 @@ STRICT RULES:
 10. A single raw_text payload may contain many forwarded messages concatenated together — extract one
     announcement per distinct notice, not one per input message; unrelated chatter and system lines produce no
     announcement at all.`;
+}
 
 /**
  * Best-effort JSON Schema for Gemini's `responseJsonSchema` config, derived
@@ -77,6 +106,7 @@ export async function extractAnnouncements(
   rawText: string,
 ): Promise<ExtractedAnnouncement[]> {
   const client = getGeminiClient();
+  const systemInstruction = buildSystemPrompt(new Date());
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -84,7 +114,7 @@ export async function extractAnnouncements(
         model: GEMINI_MODEL,
         contents: rawText,
         config: {
-          systemInstruction: SYSTEM_PROMPT,
+          systemInstruction,
           responseMimeType: "application/json",
           responseJsonSchema: RESPONSE_JSON_SCHEMA,
         },

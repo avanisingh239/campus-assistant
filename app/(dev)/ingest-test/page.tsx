@@ -20,6 +20,7 @@ import type { IngestResult } from "@/lib/ingestion/types";
 
 export default function IngestTestPage() {
   const [rawText, setRawText] = useState("");
+  const [sourceGroupName, setSourceGroupName] = useState("");
   const [result, setResult] = useState<IngestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -31,7 +32,10 @@ export default function IngestTestPage() {
     setResult(null);
 
     try {
-      const res = await ingestRawText(rawText, { sourceType: "paste" });
+      const res = await ingestRawText(rawText, {
+        sourceType: "paste",
+        sourceGroupName: sourceGroupName.trim() || "Test Group",
+      });
       setResult(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -52,6 +56,15 @@ export default function IngestTestPage() {
         SUPABASE_SERVICE_ROLE_KEY in your environment.
       </p>
       <form className="card" onSubmit={handleSubmit}>
+        <label htmlFor="source-group-name">Source group name</label>
+        <input
+          id="source-group-name"
+          type="text"
+          value={sourceGroupName}
+          onChange={(e) => setSourceGroupName(e.target.value)}
+          placeholder="e.g. CSE-2028-A (defaults to &quot;Test Group&quot; if left blank)"
+          style={{ display: "block", width: "100%", marginBlock: "0.5rem" }}
+        />
         <textarea
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}

@@ -16,7 +16,7 @@
 The AI model operates under strict constraints. It is an **information extraction engine**, not an autonomous agent or conversational chatbot.
 
 The model is **programmatically forbidden** from fabricating or assuming:
-1. **Dates & Deadlines:** Never guess an ambiguous date. If text states *"submit by tomorrow"*, the date must resolve strictly against the message's explicit timestamp or return `null`.
+1. **Dates & Deadlines:** Never guess an ambiguous date. If text states *"submit by tomorrow"* or *"due Friday"*, the date must resolve against a real anchor — the message's own explicit timestamp if it states one, otherwise the extraction request's current date (see §4.2's `CONTEXT` block, added after a real extraction silently dropped a "submit by Friday" deadline: with no anchor date at all, the model correctly had nothing to resolve "Friday" against and emitted `null` instead of guessing, exactly as this rule requires — the fix was giving it an anchor, not relaxing the rule). If neither anchor makes the reference resolvable, return `null`.
 2. **Times:** Never fill in missing times (e.g. assuming morning or afternoon).
 3. **Seat Counts:** If limited seats are mentioned without an exact number, output `seat_count: null` and set `seats_unclear: true`.
 4. **Links:** Never fabricate, shorten, or autocomplete URLs. Extract `link_url` only if a literal URL string appears in the source text.
@@ -103,14 +103,21 @@ Implemented in `lib/ai/extract.ts` via `client.models.generateContent()` (the `@
 **Rate limits:** Gemini's free tier caps requests at roughly 10/minute. `lib/ai/extract.ts` retries a 429 or 503 response up to twice with exponential backoff (1s, 2s) before throwing a `RateLimitError` whose message is meant to be shown to the user directly (see `app/(dev)/ingest-test/page.tsx`).
 
 ### 4.2 System Prompt
+Built per-request by `buildSystemPrompt(now)` in `lib/ai/extract.ts` (not a static string) so the `CONTEXT` block below always carries the real date of the extraction request — see that function's doc comment for why: without an anchor date, Gemini has no basis for resolving a relative reference like "Friday" into the concrete `event_date`/`deadline_at` the schema requires, and rule 3 correctly makes it emit `null` rather than guess. Shown here with a placeholder date/weekday:
 ```text
 You are the extraction engine for Campus Assistant.
 Your task is to analyze unstructured campus messages (e.g. from WhatsApp groups) and extract structured announcements.
 
+CONTEXT:
+Today's date is 2026-09-15 (a Tuesday). Use this to resolve relative day/time references in the text —
+"today", "tomorrow", "Friday", "next Monday", "in 3 days", etc. — into concrete event_date (YYYY-MM-DD) and
+deadline_at values. Resolving a clearly-stated relative reference this way is extraction, not guessing — rule 3
+below only forbids inventing a date the text gives no basis for at all.
+
 STRICT RULES:
-1. Extract only facts directly stated in the text.
-2. If any field (date, time, class/section match, seat count, link) is missing or unclear, output null.
-3. NEVER guess or fabricate values.
+1. Extract only facts directly stated in the text, resolving relative dates/times against today's date per CONTEXT above.
+2. If any field (date, time, class/section match, seat count, link) is missing or cannot be resolved even with today's date, output null.
+3. NEVER guess or fabricate a date or value the text gives no basis for.
 4. Categorize each announcement into exactly one primary category:
    ['deadline', 'cancellation', 'event', 'opportunity', 'registered_update', 'society_link', 'fyi', 'duplicate', 'uncategorized'].
 5. For confidence:
