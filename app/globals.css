@@ -1,19 +1,71 @@
+/*
+ * Design tokens for the whole app — forest green + gold, Baloo 2 + Inter.
+ * Ported from the Student Dashboard prototype (dashboard.html) — see
+ * CLAUDE.md: this is the first real UI pass, so this is now the app's
+ * actual visual system, not a placeholder. Bespoke, highly-specific
+ * dashboard visuals (pins, card caps, the confetti burst) live in
+ * app/student/dashboard/dashboard.module.css instead of here; this file
+ * holds the shared tokens plus the few classes other (still-placeholder)
+ * pages already depend on (.card, .muted, .scope-badge, textarea, button).
+ */
+
 :root {
-  color-scheme: light dark;
-  --bg: #0b1120;
-  --fg: #e6e9f0;
-  --muted: #8b93a7;
-  --accent: #6ea8fe;
-  --border: #232b3d;
+  color-scheme: dark;
+
+  --forest: #0c3b2e;
+  --forest-deep: #082419;
+  --sage: #6d9773;
+  --sage-strong: #8fbf95;
+  --tan: #bb8a52;
+  --gold: #ffba00;
+  --gold-bg: #ffebb0;
+
+  --mint-card: #f2faf0;
+  --ink: #12261a;
+  --ink-soft: #45604b;
+  --ink-faint: #6e8a73;
+
+  --clear: #2e7d45;
+  --clear-bg: #dcf0de;
+  --partial: #b8790a;
+  --unclear: #8a6b3e;
+  --warn-bg: #fdebd8;
+  --warn-line: var(--gold);
+  --urgent: #d6392c;
+  --urgent-bg: #fce0dc;
+
+  --tag-deadline: #a87400;
+  --tag-deadline-bg: #ffd873;
+  --tag-cancel: #c24a3a;
+  --tag-cancel-bg: #f6a99a;
+  --tag-opportunity: #c1660a;
+  --tag-opportunity-bg: #fbc584;
+  --tag-registered: #1f6b3b;
+  --tag-registered-bg: #a9dcb4;
+  --tag-society: #6b3f9e;
+  --tag-society-bg: #d2bbef;
+  --tag-duplicate: #8a6b3e;
+  --tag-duplicate-bg: #e3cfa3;
+
+  --bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Shared aliases so the site-wide generic classes below (and any other
+     page not yet rebuilt around the dashboard's own richer palette) read
+     coherently against the new theme. */
+  --bg: var(--forest-deep);
+  --fg: #eef6ee;
+  --muted: #9dc2a2;
+  --accent: var(--gold);
+  --accent-fg: var(--forest-deep);
+  --border: rgba(255, 255, 255, 0.14);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f7f8fb;
-    --fg: #10131a;
-    --muted: #5b6472;
-    --accent: #2f5fdb;
-    --border: #dde1e9;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }
 
@@ -27,7 +79,17 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-inter), -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-baloo), sans-serif;
+  font-weight: 700;
 }
 
 a {
@@ -45,6 +107,7 @@ main {
   border-radius: 0.75rem;
   padding: 1.25rem;
   margin-block: 1rem;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .muted {
@@ -81,11 +144,26 @@ button {
   border-radius: 0.5rem;
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: #061024;
+  color: var(--accent-fg);
   cursor: pointer;
 }
 
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Used by app/student/dashboard/confetti.ts — defined globally, not in
+   dashboard.module.css, because the confetti spans are appended directly
+   to document.body (outside the CSS Module's scoped tree) so a
+   module-scoped @keyframes name wouldn't resolve for them. */
+@keyframes confettiFly {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(0.5) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx), var(--ty)) scale(1.2) rotate(180deg);
+  }
 }

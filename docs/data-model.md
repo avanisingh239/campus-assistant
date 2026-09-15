@@ -169,7 +169,7 @@ Junction table linking merged raw messages to one canonical announcement — pow
 | `extracted_fields` | `jsonb` | what *this* source said, e.g. `{"date": "2025-05-05"}` |
 | `created_at` | `timestamptz` | |
 
-RLS is enabled but no policy exists yet — service-role only until one is added.
+RLS: `select` open to any `authenticated` user, added in the Student Dashboard pass (⚠️ pending a live migration — see `CLAUDE.md` §Student Dashboard for the exact SQL) — needed for the trace-to-source drawer and the "Confirmed by N sources" tag. No insert/update/delete policy; writes still go through the service-role client (the ingestion pipeline).
 
 ### 3.8 `contradictions` (3.2)
 Never silently pick one version when merged sources disagree.
@@ -183,7 +183,7 @@ Never silently pick one version when merged sources disagree.
 | `resolved` | `boolean` | default `false` |
 | `created_at` | `timestamptz` | |
 
-RLS enabled, no policy defined yet.
+RLS: `select` open to any `authenticated` user, same addition and same reasoning as `announcement_sources` above — needed for the contradiction banner. No insert/update/delete policy.
 
 ### 3.9 `student_announcement_status` (4.1)
 Per-student interest/registration state, one row per `(student_id, announcement_id)` pair (unique constraint).
@@ -214,7 +214,7 @@ The most important invariant in the whole schema:
 - **`messages` has a `select` policy but no `insert` policy for the `authenticated` role.** Combined with the comment in `supabase/schema.sql` ("write access restricted to service role ... except admin_form submissions"), this means: **the ingestion pipeline (paste, chat-export, and non-admin-form flows) must write through a service-role Supabase client on the server**, never through the browser/anon client. See `lib/supabase/admin.ts`.
 - Likewise, `announcements`, `announcement_sources`, `contradictions`, `clashes`, and `free_slots` either have no insert policy or only a role-gated one — the deterministic engine and the AI-extraction pipeline both need to run server-side with the service-role client, then let students read the results through the normal `select` policies.
 - Everything under a student's own id (`timetable_entries`, `student_announcement_status`, `clashes`, `free_slots`, `last_seen`) is strictly private to `auth.uid()`.
-- `admin_scopes`, `announcement_sources`, and `contradictions` have RLS **enabled** but **no policy defined yet** in the live schema — until policies are added, only the service role can touch them. Don't build a client-side feature that assumes an authenticated admin/student can read these directly; go through a server action/route handler.
+- `admin_scopes` has RLS **enabled** but **no policy defined yet** in the live schema — until one is added, only the service role can touch it. Don't build a client-side feature that assumes an authenticated admin can read their own scope directly; go through a server action/route handler. `announcement_sources` and `contradictions` were in the same state until the Student Dashboard pass added a `select`-for-`authenticated` policy to both (⚠️ still pending a live migration — see `CLAUDE.md` §Student Dashboard) — they're metadata on already-public announcements, not private per-user data like `admin_scopes` is, so a broad read policy is the right shape for them, not a server-side-only pattern.
 
 ---
 

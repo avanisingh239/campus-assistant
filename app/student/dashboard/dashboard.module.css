@@ -1,0 +1,722 @@
+/*
+ * Ported from dashboard.html's <style> block, adapted to a CSS Module
+ * (camelCase class names, category colors driven by a data-category
+ * attribute instead of an inline --shadow-c style). Kept as close to the
+ * original as the class-naming translation allows — see icons.tsx and
+ * category-meta.ts for the two categories (fyi, uncategorized) the
+ * prototype never demonstrated a card for.
+ */
+
+.site {
+  background:
+    radial-gradient(circle at 10% 10%, rgba(109, 151, 115, 0.16) 0, transparent 220px),
+    radial-gradient(circle at 90% 6%, rgba(255, 186, 0, 0.09) 0, transparent 260px),
+    radial-gradient(circle at 70% 60%, rgba(109, 151, 115, 0.12) 0, transparent 260px),
+    radial-gradient(circle at 15% 80%, rgba(255, 186, 0, 0.07) 0, transparent 220px),
+    var(--forest);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.bgSym {
+  position: absolute;
+  opacity: 0.12;
+  color: var(--sage-strong);
+  pointer-events: none;
+  animation: float1 7s ease-in-out infinite;
+  z-index: 0;
+}
+.bgSym svg {
+  width: 100%;
+  height: 100%;
+}
+.s1 {
+  top: 260px;
+  left: 4%;
+  width: 26px;
+  height: 26px;
+  animation-duration: 6s;
+}
+.s2 {
+  top: 180px;
+  right: 6%;
+  width: 30px;
+  height: 30px;
+  color: var(--gold);
+  opacity: 0.16;
+  animation-duration: 8s;
+  animation-delay: 1s;
+}
+.s3 {
+  bottom: 220px;
+  left: 8%;
+  width: 24px;
+  height: 24px;
+  animation-duration: 7.5s;
+  animation-delay: 0.4s;
+}
+.s4 {
+  bottom: 140px;
+  right: 5%;
+  width: 26px;
+  height: 26px;
+  color: var(--gold);
+  opacity: 0.14;
+  animation-duration: 6.5s;
+  animation-delay: 0.8s;
+}
+@keyframes float1 {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(10deg);
+  }
+}
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== HEADER ===== */
+.topbar {
+  padding: 28px 0 26px;
+}
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.brandBlock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logoMark {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+.appName {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  margin: 0;
+  color: #ffffff;
+}
+.tagline {
+  font-size: 13px;
+  color: #bfe0c4;
+  font-weight: 500;
+  margin: 2px 0 0;
+}
+.greeting {
+  font-size: 12px;
+  color: var(--gold);
+  margin: 0 0 6px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.heroRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.heroBadge {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 3px dashed var(--forest-deep);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-9deg);
+  box-shadow: 5px 5px 0 var(--forest-deep);
+  flex-shrink: 0;
+  animation: badgeWiggle 3.5s ease-in-out infinite;
+}
+@keyframes badgeWiggle {
+  0%,
+  100% {
+    transform: rotate(-9deg);
+  }
+  50% {
+    transform: rotate(-4deg);
+  }
+}
+.heroNumber {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--forest-deep);
+}
+.heroSub {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--forest-deep);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.heroLabel {
+  font-size: 13px;
+  color: #ddf0df;
+  max-width: 160px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+/* ===== DIFF BANNER ===== */
+.diffbar {
+  margin: 0 0 22px;
+  background: var(--gold);
+  border: 3px solid var(--forest-deep);
+  border-radius: 16px;
+  padding: 13px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  box-shadow: 5px 5px 0 var(--forest-deep);
+  animation: popIn 0.5s var(--bounce) both;
+  animation-delay: 0.1s;
+}
+.diffbarIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--forest-deep);
+  animation: ring 1.6s ease-in-out infinite;
+  transform-origin: top center;
+}
+.diffbarIcon svg {
+  width: 100%;
+  height: 100%;
+}
+@keyframes ring {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  10% {
+    transform: rotate(14deg);
+  }
+  20% {
+    transform: rotate(-12deg);
+  }
+  30% {
+    transform: rotate(8deg);
+  }
+  40% {
+    transform: rotate(0deg);
+  }
+}
+.diffbarText {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--forest-deep);
+  font-weight: 500;
+  flex: 1;
+}
+.diffbarText strong {
+  font-weight: 700;
+}
+.diffDismiss {
+  background: var(--forest-deep);
+  border: none;
+  color: var(--gold);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 6px 13px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+.diffDismiss:hover {
+  transform: scale(1.08) rotate(-4deg);
+}
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ===== TABS ===== */
+.tabRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 26px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #9dc2a2;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 9px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    transform 0.2s var(--bounce),
+    background 0.2s ease,
+    color 0.2s ease;
+  text-decoration: none;
+}
+.tab svg {
+  width: 16px;
+  height: 16px;
+}
+.tab:hover {
+  transform: translateY(-2px);
+}
+.tabActive {
+  background: var(--gold);
+  color: var(--forest-deep);
+  border-color: var(--gold);
+}
+
+.sectionLabel {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold);
+  margin: 0 0 18px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sectionLabel svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ===== CARD GRID ===== */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 34px 26px;
+  padding-bottom: 60px;
+}
+
+.card {
+  background: var(--mint-card);
+  border: 3px solid var(--forest-deep);
+  border-radius: 18px;
+  overflow: visible;
+  animation: springIn 0.55s var(--bounce) both;
+  transition:
+    transform 0.2s var(--bounce),
+    box-shadow 0.2s ease;
+  box-shadow: 6px 6px 0 var(--shadow-c, var(--sage));
+  position: relative;
+}
+.card:nth-child(3n + 1) {
+  --rot: -1.6deg;
+}
+.card:nth-child(3n + 2) {
+  --rot: 1.4deg;
+}
+.card:nth-child(3n + 3) {
+  --rot: -1deg;
+}
+@keyframes springIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.94) rotate(0deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(var(--rot));
+  }
+}
+.card:nth-child(1) {
+  animation-delay: 0.08s;
+}
+.card:nth-child(2) {
+  animation-delay: 0.14s;
+}
+.card:nth-child(3) {
+  animation-delay: 0.2s;
+}
+.card:nth-child(4) {
+  animation-delay: 0.26s;
+}
+.card:nth-child(5) {
+  animation-delay: 0.32s;
+}
+.card:nth-child(6) {
+  animation-delay: 0.38s;
+}
+.card:hover {
+  transform: translateY(-6px) scale(1.05) rotate(0deg) !important;
+  box-shadow: 11px 11px 0 var(--shadow-c, var(--sage));
+}
+
+/* Category -> --shadow-c. `event` shares `opportunity`'s color family
+   (distinguished by icon instead — see icons.tsx); `uncategorized` shares
+   `duplicate`'s (see category-meta.ts). */
+.card[data-category="deadline"] {
+  --shadow-c: var(--tag-deadline-bg);
+}
+.card[data-category="cancellation"] {
+  --shadow-c: var(--tag-cancel-bg);
+}
+.card[data-category="event"],
+.card[data-category="opportunity"] {
+  --shadow-c: var(--tag-opportunity-bg);
+}
+.card[data-category="registered_update"] {
+  --shadow-c: var(--tag-registered-bg);
+}
+.card[data-category="society_link"] {
+  --shadow-c: var(--tag-society-bg);
+}
+.card[data-category="fyi"] {
+  --shadow-c: var(--sage-strong);
+}
+.card[data-category="duplicate"],
+.card[data-category="uncategorized"] {
+  --shadow-c: var(--tag-duplicate-bg);
+}
+
+.pin {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--shadow-c, var(--sage));
+  border: 2.5px solid var(--forest-deep);
+  z-index: 4;
+  box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.15);
+}
+.pin::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.cardCap {
+  background: var(--shadow-c, var(--sage));
+  padding: 13px 14px 11px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 15px 15px 0 0;
+}
+.iconChip {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--forest-deep);
+  transform: rotate(-4deg);
+  transition: transform 0.25s var(--bounce);
+}
+.card:hover .iconChip {
+  transform: rotate(8deg) scale(1.15);
+}
+.iconChip svg {
+  width: 19px;
+  height: 19px;
+}
+.capMeta {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--forest-deep);
+  font-weight: 700;
+  opacity: 0.85;
+}
+.tag {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 20px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--forest-deep);
+}
+
+.cardBody {
+  padding: 15px 15px 14px;
+  position: relative;
+}
+.urgentTag {
+  position: absolute;
+  top: -14px;
+  right: -6px;
+  background: var(--urgent-bg);
+  border: 2.5px solid var(--urgent);
+  color: var(--urgent);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 10px 5px 7px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transform: rotate(9deg);
+  animation: pulseTag 1.4s ease-in-out infinite;
+  z-index: 5;
+}
+.urgentTag svg {
+  width: 14px;
+  height: 14px;
+}
+@keyframes pulseTag {
+  0%,
+  100% {
+    transform: rotate(9deg) scale(1);
+  }
+  50% {
+    transform: rotate(9deg) scale(1.14);
+  }
+}
+
+.cbadge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  display: inline-block;
+  margin-bottom: 9px;
+  transform: rotate(-1.5deg);
+}
+.confidenceClear {
+  background: var(--clear-bg);
+  color: var(--clear);
+}
+.confidencePartial {
+  background: var(--gold-bg);
+  color: var(--partial);
+}
+.confidenceUnclear {
+  background: #eedfc0;
+  color: var(--unclear);
+}
+
+.cardTitle {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  line-height: 1.3;
+  color: var(--forest);
+}
+.cardWhy {
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0 0 4px;
+}
+.cardNext {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 11px;
+}
+.verb {
+  color: var(--forest);
+  font-weight: 800;
+}
+
+.contradiction {
+  background: var(--warn-bg);
+  border: 2px dashed var(--warn-line);
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 12px;
+  color: #7a5a0f;
+  margin-bottom: 11px;
+  line-height: 1.45;
+  font-weight: 500;
+}
+.mergeNote {
+  font-size: 11.5px;
+  color: var(--tag-duplicate);
+  font-weight: 700;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mergeNote svg {
+  width: 13px;
+  height: 13px;
+}
+
+.cardActions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.pill {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 13px;
+  border-radius: 20px;
+  border: 2.5px solid var(--forest);
+  background: #fff;
+  color: var(--forest);
+  cursor: pointer;
+  transition:
+    transform 0.15s var(--bounce),
+    background 0.15s ease;
+}
+.pill:hover {
+  transform: translateY(-2px) scale(1.08);
+}
+.pill:active {
+  transform: scale(0.92);
+}
+.pill:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+.pillActive {
+  background: var(--clear-bg);
+}
+.pillActive.pillRegistered {
+  background: var(--forest);
+  color: var(--gold);
+}
+
+.traceToggle {
+  font-size: 12px;
+  color: var(--forest);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 10px 0 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 700;
+}
+.traceSource {
+  margin-top: 9px;
+  padding: 10px 12px;
+  background: #e6f2e4;
+  border-left: 3px solid var(--sage);
+  border-radius: 0 10px 10px 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+.srcLabel {
+  font-size: 11px;
+  color: var(--forest);
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+.linkChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--tag-society-bg);
+  border: 2px solid var(--tag-society);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--tag-society);
+  font-weight: 700;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.linkChip svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.unverified {
+  font-size: 10.5px;
+  color: var(--urgent);
+  font-weight: 800;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ===== EMPTY / LOADING STATES ===== */
+.emptyState {
+  text-align: center;
+  padding: 60px 20px;
+  color: #ddf0df;
+}
+.emptyState h2 {
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.loadingCard {
+  background: rgba(255, 255, 255, 0.06);
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  height: 220px;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 640px) {
+  .wrap {
+    padding: 0 16px;
+  }
+  .topbar {
+    padding: 20px 0 18px;
+  }
+  .headerRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .heroRow {
+    width: 100%;
+  }
+  .cards {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}

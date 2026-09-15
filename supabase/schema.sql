@@ -275,6 +275,24 @@ create policy "student manages own last_seen" on last_seen for all using (auth.u
 create policy "messages readable by authenticated users" on messages
   for select using (auth.role() = 'authenticated');
 
+-- ============================================================
+-- ADDED — Student Dashboard pass (see CLAUDE.md). NOT part of the
+-- originally-applied migration this file was a verbatim copy of; these two
+-- policies are new and, as of this commit, still need to be run against
+-- the live project (see CLAUDE.md for the exact command). Both tables had
+-- RLS enabled with no SELECT policy at all, meaning the RLS-respecting
+-- client always got an empty result from them regardless of who was
+-- asking — same "readable by authenticated users" shape as announcements/
+-- messages above, since both are metadata on already-public announcements
+-- (who reported them, what disagreed), not private per-student data.
+-- ============================================================
+
+create policy "announcement_sources readable by authenticated users" on announcement_sources
+  for select using (auth.role() = 'authenticated');
+
+create policy "contradictions readable by authenticated users" on contradictions
+  for select using (auth.role() = 'authenticated');
+
 
 -- ============================================================
 -- NOTES FOR NEXT STEPS (not SQL — read before wiring the app)
