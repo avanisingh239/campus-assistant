@@ -2,6 +2,10 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractAnnouncements, ExtractionError } from "@/lib/ai/extract";
+import {
+  syncFreeSlotsForCancellation,
+  matchAnnouncementToOpenFreeSlots,
+} from "@/lib/deterministic/sync";
 import { toAnnouncementRow } from "./map-to-announcement";
 import type { IngestOptions, IngestResult } from "./types";
 
@@ -16,9 +20,16 @@ import type { IngestOptions, IngestResult } from "./types";
  * Deliberately NOT implemented here (see docs/data-model.md §5 — these are
  * deterministic-engine work, not part of this pass):
  *   - deduplication against existing announcements ("Confirmed by N sources")
- *   - clash detection / free-slot matching
  *   - urgency_score / consequence_weight / priority_score
  * Every call currently inserts new `announcements` rows unconditionally.
+ *
+ * Free-slot matching (lib/deterministic/sync.ts) DOES run here now, right
+ * after each announcement is inserted — see the per-item loop below. Clash
+ * detection deliberately does NOT run from here: a brand-new announcement
+ * has no student_announcement_status rows yet, so it can't possibly
+ * produce a class_vs_event/event_vs_event clash the moment it's created
+ * (both are gated on interested/registered). Clash detection's real
+ * trigger points are lib/timetable/actions.ts and lib/engagement/actions.ts.
  */
 export async function ingestRawText(
   rawText: string,
@@ -89,6 +100,16 @@ export async function ingestRawText(
     }
 
     announcementIds.push(announcement.id as string);
+
+    // Rule 5 (docs/data-model.md §5): free-slot matching runs at creation
+    // time in both directions - a cancellation opens slots across every
+    // matching student's timetable, and an event/opportunity gets checked
+    // against slots that are already open from an earlier cancellation.
+    if (row.category === "cancellation") {
+      await syncFreeSlotsForCancellation(supabase, announcement.id as string);
+    } else if (row.category === "event" || row.category === "opportunity") {
+      await matchAnnouncementToOpenFreeSlots(supabase, announcement.id as string);
+    }
   }
 
   return {

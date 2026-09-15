@@ -53,7 +53,7 @@ Nothing in this repo talks to a live Supabase project or the Gemini API without 
 
 - **Gemini (`gemini-3.6-flash`, via `lib/ai/gemini.ts` / `lib/ai/extract.ts`) is only allowed to write**: `category`, `title`, `why_it_matters`, `what_to_do_next`, `confidence`, `confidence_note`, the extracted date/time fields, `linked_class_name`, `match_confidence`, `seat_count`/`seats_unclear`, and `link_url`. It never computes `urgency_score`, `consequence_weight`, or `priority_score` (a generated column), and it never decides `clashes`/`free_slots` rows.
 - **Gemini's output is untrusted input**, validated twice: once explicitly in `lib/ai/extract.ts` (`JSON.parse()` + `ExtractionBatchSchema.safeParse()` — Gemini's own `responseJsonSchema` is only a best-effort hint, see `docs/ai-contracts.md` §4, so this app-level parse is the real gate, unlike the Claude API's `messages.parse()` which validated inline), and again by `lib/ingestion/map-to-announcement.ts`'s pure transform before the row is inserted.
-- **None of the deterministic engine exists yet**: clash detection (class-vs-class, class-vs-event, event-vs-event interval overlap), free-slot matching, deduplication ("Confirmed by N sources"), the priority formula, and the time-decay cron are all still just comments/notes in `supabase/schema.sql` and `docs/data-model.md` §5. `lib/ingestion/ingest.ts` currently inserts a new `announcements` row per extracted item unconditionally — no dedup check yet.
+- **Part of the deterministic engine is implemented**: clash detection (class-vs-class, class-vs-event, event-vs-event) and free-slot matching live in `lib/deterministic/` — see §Deterministic engine below. Deduplication ("Confirmed by N sources"), the priority formula, and the time-decay cron are still just comments/notes in `supabase/schema.sql` and `docs/data-model.md` §5. `lib/ingestion/ingest.ts` currently inserts a new `announcements` row per extracted item unconditionally — no dedup check yet.
 
 ## The one working pipeline
 
@@ -61,7 +61,27 @@ Nothing in this repo talks to a live Supabase project or the Gemini API without 
 
 Gemini's free tier is rate-limited to roughly 10 requests/minute — `extractAnnouncements()` retries a 429/503 with backoff (1s, 2s) before throwing `RateLimitError`, which `/ingest-test` surfaces as a plain error message rather than a crash.
 
-**That dev route is a temporary, unauthenticated harness — delete it or gate it behind an admin check before this app is reachable by anyone but developers.** It calls a Server Action that writes through the service-role client with no auth check of its own, and `middleware.ts` doesn't protect `/ingest-test` (it only matches `/student/*` and `/admin/*`).
+**That dev route is a temporary, unauthenticated harness — delete it or gate it behind an admin check before this app is reachable by anyone but developers.** It calls a Server Action that writes through the service-role client with no auth check of its own, and `middleware.ts` doesn't protect `/ingest-test` (it only matches `/student/*` and `/admin/*`). Same warning applies to `/clash-test` below.
+
+## Deterministic engine (clashes & free slots)
+
+`lib/deterministic/` implements clash detection and free-slot matching (docs/requirements-traceability.md Features 2.4/2.5) as plain TypeScript — not a Postgres function or Edge Function, even though `supabase/schema.sql`'s own closing notes mention those; see `docs/data-model.md` §5 for why (no such infrastructure exists in this repo, and `docs/architecture.md`'s MVP line already calls for "In-memory/Node.js deterministic engines"). Same pure-function-plus-thin-DB-wrapper-plus-colocated-tests shape as `lib/ingestion/map-to-announcement.ts`:
+- `overlap.ts`, `clashes.ts`, `free-slots.ts` — pure, fully unit-tested (61 tests total across these plus the AI/ingestion tests), no DB access.
+- `sync.ts` — the DB-fetching/writing wrappers (`syncClashesForStudent`, `syncFreeSlotsForCancellation`, `matchAnnouncementToOpenFreeSlots`). Always called with the service-role client — `clashes`/`free_slots` have no write policy for `authenticated` (§Data model below).
+- `types.ts` — the narrow row shapes these functions read; not tied to any generated Supabase DB types (this project doesn't generate any).
+
+**Trigger points** — three, per the exact rules this engine implements:
+1. New `cancellation`/`event`/`opportunity` announcement → `lib/ingestion/ingest.ts` calls `syncFreeSlotsForCancellation`/`matchAnnouncementToOpenFreeSlots`. Clash detection deliberately does *not* run here — a brand-new announcement has no engagement rows yet, so it can't produce a class_vs_event/event_vs_event clash the instant it's created.
+2. Timetable entry added/edited/deleted → `lib/timetable/actions.ts` (`addTimetableEntry`/`updateTimetableEntry`/`deleteTimetableEntry`) calls `syncClashesForStudent`.
+3. Interest/registration status changes → `lib/engagement/actions.ts` (`setAnnouncementStatus`) calls `syncClashesForStudent`.
+
+`syncClashesForStudent` recomputes *all* of one student's clashes from scratch (delete + reinsert) rather than incrementally patching — simpler to keep correct across three independent call sites, and cheap at one-student scale.
+
+**lib/timetable/actions.ts and lib/engagement/actions.ts are new Server Actions with no UI calling them yet** (same situation as the ingestion pipeline before `/ingest-test`) — a future timetable/card UI should call these directly rather than writing to `timetable_entries`/`student_announcement_status` on its own, or the clash-resync won't fire. Unlike the ingestion pipeline, these write through the RLS-respecting client (`lib/supabase/server.ts`) for the actual table write — students own both tables directly per `supabase/schema.sql` — and only reach for the service-role client for the `clashes` resync step.
+
+**`app/(dev)/clash-test`** is the manual-verification harness for this engine, same temporary/unauthenticated pattern as `/ingest-test` (see `app/(dev)/clash-test/actions.ts`'s doc comment for why it bypasses `lib/timetable/actions.ts`/`lib/engagement/actions.ts` rather than reusing them: no real signed-in student session exists to test with yet).
+
+**One assumption this engine had to make that the spec left open:** `timetable_entries.day_of_week` is documented only as "0-6, configurable start day, not hardcoded Mon-Sun" with nothing anywhere actually configuring it. `dayOfWeekFromDate` in `overlap.ts` uses `Date.getUTCDay()`'s own numbering (0=Sunday) as the one unambiguous default available — see that function's doc comment before changing it.
 
 ## Route tree & persona isolation
 
@@ -74,6 +94,7 @@ app/
 │   ├── admin/login/page.tsx             # "/admin/login"
 │   └── login-form.tsx                   # shared client form (not a route)
 ├── (dev)/ingest-test/page.tsx           # "/ingest-test" — TEMPORARY, see above
+├── (dev)/clash-test/page.tsx            # "/clash-test" — TEMPORARY, see §Deterministic engine
 ├── student/                             # REAL folder — see note below
 │   ├── layout.tsx                       # nav + sign-out, force-dynamic
 │   ├── dashboard/, timetable/, communities/page.tsx   # all placeholders
