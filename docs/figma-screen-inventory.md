@@ -45,6 +45,7 @@ Every element in this inventory is categorized into one of five statuses:
 ---
 
 ### 1.2 Student Dashboard
+* **As built (follow-up pass):** "Filter feed by category" is real — see CLAUDE.md's §Student Dashboard for the exact `All`/`Deadline`/`Events`/`Conflicts`/`Unclear` tab set and why two of those don't map onto a single `announcement_category` value. A stat row (things-to-do/potential-clashes/free-slot-matches/don't-miss counts) and a free-slot spotlight panel were added between the diff banner and the priority feed — not originally itemized in this screen's Main Components list below, but the same real data §3.11/§3.13 already called for on this screen. Time-Travel Demo control bar is still not built.
 * **Purpose:** The primary operational screen displaying prioritized action items, change diffs, and unexpected opportunity lanes.
 * **User Role:** Student
 * **Entry Point:** `/student/dashboard`

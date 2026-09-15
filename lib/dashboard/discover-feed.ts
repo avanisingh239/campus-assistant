@@ -1,15 +1,33 @@
 import type { DashboardAnnouncement } from "./types";
 
 /**
+ * The same "discovery-worthy" predicate as app/student/dont-miss-this's
+ * `.or()` Supabase filter, exposed as a plain JS function for call sites
+ * that already have a full, unfiltered announcement list in memory and
+ * don't want to issue a second query just to re-derive this — namely the
+ * dashboard's stat row (see app/student/dashboard/dashboard-client.tsx),
+ * which needs a "Don't miss" count alongside announcements it already
+ * fetched with no category filter. The dedicated /student/dont-miss-this
+ * page keeps pushing the filter into SQL for its own reasons (never fetch
+ * a row it couldn't show), so the two definitions are kept in sync by
+ * hand — if this predicate changes, update that page's `.or()` string too.
+ */
+export function isDiscoveryWorthy(announcement: DashboardAnnouncement): boolean {
+  if (announcement.category === "opportunity") return true;
+  return announcement.category === "event" && (announcement.seat_count !== null || announcement.seats_unclear);
+}
+
+/**
  * Filters and sorts the "Don't Miss This" discovery feed
  * (docs/product-spec.md Area A.1 / Feature 4.3) from the same
  * DashboardAnnouncement shape the Action Plan dashboard uses.
  *
  * The category filter itself (opportunity, or event with a seat count or
- * seats_unclear) runs in the page's Supabase query, not here — that way
- * the query only ever fetches rows this feed could show, same "push the
- * filter into SQL" reasoning as the rest of this codebase. This function
- * owns the two rules that need the shaped/joined data to evaluate:
+ * seats_unclear — see `isDiscoveryWorthy` above) runs in the page's
+ * Supabase query, not here — that way the query only ever fetches rows
+ * this feed could show, same "push the filter into SQL" reasoning as the
+ * rest of this codebase. This function owns the two rules that need the
+ * shaped/joined data to evaluate:
  *  - excludes anything the student has already marked not_interested
  *    ("Not Interested" suppresses resurfacing in digests per
  *    docs/product-spec.md — this feed counts as a digest)
