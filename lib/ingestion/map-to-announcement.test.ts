@@ -22,21 +22,21 @@ const base: ExtractedAnnouncement = {
 
 describe("toAnnouncementRow", () => {
   it("passes through fields the AI is allowed to set", () => {
-    const row = toAnnouncementRow(base);
+    const row = toAnnouncementRow(base, "Robotics workshop, register on the club form.");
     expect(row.category).toBe("opportunity");
     expect(row.title).toBe(base.title);
     expect(row.link_url).toBe(base.link_url);
   });
 
   it("never includes deterministic-engine-only fields", () => {
-    const row = toAnnouncementRow(base);
+    const row = toAnnouncementRow(base, "Robotics workshop, register on the club form.");
     expect(row).not.toHaveProperty("urgency_score");
     expect(row).not.toHaveProperty("consequence_weight");
     expect(row).not.toHaveProperty("priority_score");
   });
 
   it("keeps seats_unclear=true when seat_count is null", () => {
-    const row = toAnnouncementRow(base);
+    const row = toAnnouncementRow(base, "Robotics workshop, register on the club form.");
     expect(row.seat_count).toBeNull();
     expect(row.seats_unclear).toBe(true);
   });
@@ -45,12 +45,40 @@ describe("toAnnouncementRow", () => {
     // A contradiction the Zod schema's types allow (both a count AND the
     // unclear flag) but that shouldn't reach the database — a stated count
     // isn't "unclear".
-    const row = toAnnouncementRow({
-      ...base,
-      seat_count: 12,
-      seats_unclear: true,
-    });
+    const row = toAnnouncementRow(
+      { ...base, seat_count: 12, seats_unclear: true },
+      "Robotics workshop, register on the club form.",
+    );
     expect(row.seat_count).toBe(12);
     expect(row.seats_unclear).toBe(false);
+  });
+
+  it("computes link_verified deterministically instead of trusting an AI-supplied value", () => {
+    // base.link_url is "https://forms.example.com/robotics" — not on the
+    // allowlist (only forms.gle is), so this should come back unverified
+    // regardless of what the AI "thought."
+    const row = toAnnouncementRow(base, "Robotics workshop, register on the club form.");
+    expect(row.link_verified).toBe(false);
+  });
+
+  it("reproduces the real bug report: a spoofed domain claimed as a WhatsApp group link", () => {
+    const row = toAnnouncementRow(
+      { ...base, link_url: "https://whatsap-group-join.xyz/abc123" },
+      "Join our WhatsApp group here: https://whatsap-group-join.xyz/abc123",
+    );
+    expect(row.link_verified).toBe(false);
+  });
+
+  it("verifies a real chat.whatsapp.com link from the raw message text", () => {
+    const row = toAnnouncementRow(
+      { ...base, link_url: "https://chat.whatsapp.com/AbCdEf12345" },
+      "Join our WhatsApp group here: https://chat.whatsapp.com/AbCdEf12345",
+    );
+    expect(row.link_verified).toBe(true);
+  });
+
+  it("defaults link_verified to true when there's no link at all", () => {
+    const row = toAnnouncementRow({ ...base, link_url: null }, "No link in this one.");
+    expect(row.link_verified).toBe(true);
   });
 });

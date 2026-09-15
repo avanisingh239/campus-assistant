@@ -84,6 +84,7 @@ export const ExtractedAnnouncementSchema = z.object({
 
 **What changed from the earlier draft of this doc**, so nobody re-introduces it by accident:
 - Removed `course_code`, `faculty_name`, `target_section`, `location_room`, `registration_link`, `seat_count_unclear`, `consequence_tier` — none of these are columns on the live `announcements` table. `registration_link` → `link_url`; `seat_count_unclear` → `seats_unclear`.
+- **`link_verified` is deliberately never part of this schema at all** — not removed, never added. `announcements.link_verified` is a real column, but whether a link is trustworthy is exactly the kind of objective, checkable fact this project's architecture keeps out of the AI's hands (see CLAUDE.md's Core architectural rule and §Link verification): `lib/ingestion/verify-link.ts` computes it deterministically from the URL's hostname and the raw message text, overriding the column's DB default (`true`) rather than trusting a Gemini guess. A real bug — a spoofed `.xyz` domain reaching students as "verified" — is exactly what asking the AI to judge this would keep producing.
 - `confidence_state` → `confidence`; its `partially_clear` value → `partial` (matches the real `confidence_level` enum).
 - `confidence_notes` → `confidence_note` (singular, matches the real column).
 - The 9-category enum values are shorter in the real schema: `cancellation_reschedule` → `cancellation`, `limited_seat_opportunity` → `opportunity`, `registered_event_update` → `registered_update`, `society_group_link` → `society_link`.

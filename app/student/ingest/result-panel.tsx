@@ -58,7 +58,7 @@ export function ResultPanel({
         </p>
         <div className={styles.formActions}>
           <Button className={styles.actionButton} onClick={onIngestMore}>
-            Try again
+            Add another message
           </Button>
         </div>
       </div>
@@ -171,7 +171,7 @@ export function ResultPanel({
               View on your dashboard
             </Link>
             <Button variant="ghost" className={styles.actionButton} type="button" onClick={onIngestMore}>
-              Add more messages
+              Add another message
             </Button>
           </>
         ) : (
@@ -180,7 +180,7 @@ export function ResultPanel({
               Retry
             </Button>
             <Button variant="ghost" className={styles.actionButton} type="button" onClick={onIngestMore}>
-              Back
+              Add another message
             </Button>
           </>
         )}

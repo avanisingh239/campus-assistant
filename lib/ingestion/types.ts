@@ -1,6 +1,6 @@
 import type { AnnouncementCategory, ConfidenceLevel } from "@/lib/dashboard/types";
 
-export type IngestSourceType = "paste" | "whatsapp_export" | "admin_form";
+export type IngestSourceType = "paste" | "whatsapp_export" | "admin_form" | "whatsapp_bot";
 
 export interface IngestOptions {
   sourceType?: IngestSourceType;

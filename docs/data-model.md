@@ -156,7 +156,7 @@ The canonical entity every student-facing card renders from.
 | `priority_score` | `numeric`, **generated** | `coalesce(urgency_score,0) * coalesce(consequence_weight,1)`, stored — recomputes automatically whenever the two inputs change |
 | `created_at` / `updated_at` | `timestamptz` | |
 
-RLS: `select` open to any `authenticated` user (shared feed). `insert` is restricted to rows where the caller's `profiles.role = 'admin'` — **note this only checks role, not scope**; scope-matching (does this admin's `class_name`/`society_id` match the announcement they're posting) is application-level, enforced in the code path that handles `admin_form` submissions, not in SQL.
+RLS: `select` was originally open to any `authenticated` user (a fully global shared feed) — a real cross-student privacy bug found in testing (a student could see every other class's cancellation/deadline announcements), fixed by scoping `select` to the viewing student's own class (matched via `messages.source_group_name` against `profiles.class_name`) plus a fixed set of inherently cross-class categories (`society_link`, `event`, `opportunity`, `registered_update`) — see CLAUDE.md's §Cross-student data isolation for the full reasoning and the exact policy. `insert` is restricted to rows where the caller's `profiles.role = 'admin'` — **note this only checks role, not scope**; scope-matching (does this admin's `class_name`/`society_id` match the announcement they're posting) is application-level, enforced in the code path that handles `admin_form` submissions, not in SQL.
 
 ### 3.7 `announcement_sources`
 Junction table linking merged raw messages to one canonical announcement — powers trace-to-source (3.3) and deduplication (2.6).
