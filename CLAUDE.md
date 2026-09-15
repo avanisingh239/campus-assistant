@@ -261,6 +261,8 @@ Both Server Actions write through the service-role client (`createAdminClient()`
 
 **Two test-admin scripts now exist** — `scripts/create-test-admin.mjs` (pre-existing, `scope_type: 'class'`) and `scripts/create-test-admin-society.mjs` (added this pass, `scope_type: 'society'` — also seeds a `societies` row for it, since none exist in a fresh project). Testing both flows needs both.
 
+**Real bug found in testing, fixed in a later pass: field labels on both forms were nearly invisible.** `components/ui/text-field.tsx`'s shared `TextField` colors its label `var(--forest)` (a dark green) by design — that's correct on the light mint card every other caller (`/login`, `/student/timetable`'s form) renders it inside, but these two forms sit in a plain, near-transparent `.card` directly on the dark page background, not a mint card, so the same dark-green text was almost unreadable against it. Fixed with a scoped override, not a change to the shared default (which is still correct everywhere else it's used): `TextField` gained an optional `labelClassName` prop (every other call site omits it and renders identically to before), and every `TextField` in `class-update-form.tsx`/`society-update-form.tsx` now passes `labelClassName={styles.fieldLabel}`, a new rule in `admin-dashboard.module.css` setting `color: var(--muted)` — the same `#9dc2a2` value already used for label/secondary text directly on this dark canvas elsewhere (the tab row's `.tab` in `app/student/shell.module.css`, the timetable grid's `.dayEmpty` in `app/student/timetable/timetable.module.css`), not a new color invented for this fix.
+
 ## Route tree & persona isolation
 
 ```

@@ -9,6 +9,21 @@
  * already covers.
  */
 
+/* TextField's shared `.fieldLabel` (components/ui.module.css) defaults to
+   `var(--forest)` — a dark green meant to read against the light mint card
+   /login's and /student/timetable's own forms sit on. This page's `.card`
+   is a near-transparent overlay straight on the dark page background (see
+   this file's own top-of-file note), so that dark-green label text was
+   almost invisible. Overriding just the color here, to the same
+   `var(--muted)` value already used for label/secondary text directly on
+   this dark canvas elsewhere (the tab row's `.tab` in
+   app/student/shell.module.css, and the timetable grid's `.dayEmpty` in
+   app/student/timetable/timetable.module.css both use this exact color) —
+   not a new value invented for this fix. */
+.fieldLabel {
+  color: var(--muted);
+}
+
 .radioGroup {
   border: none;
   padding: 0;
