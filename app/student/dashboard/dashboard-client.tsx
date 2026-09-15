@@ -1,25 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import type { DashboardAnnouncement } from "@/lib/dashboard/types";
 import type { EngagementStatus } from "@/lib/deterministic/types";
 import type { DiffSummary } from "@/lib/dashboard/diff-summary";
 import { setAnnouncementStatus } from "@/lib/engagement/actions";
 import { dismissDiffBanner } from "@/lib/dashboard/actions";
 import { supportsEngagementToggle } from "@/lib/dashboard/category-meta";
-import { formatHeaderDate } from "@/lib/dashboard/format";
 import { Card } from "./card";
-import {
-  LogoMark,
-  BellIcon,
-  StarIcon,
-  TwoCirclesIcon,
-  CalendarIcon,
-  ActionPlanIcon,
-  LightningIcon,
-} from "@/components/icons";
+import { BellIcon, LightningIcon } from "@/components/icons";
 import { CanvasBackground } from "@/components/canvas-background";
+import { AppHeader } from "../app-header";
+import { TabRow } from "../tab-row";
+import shellStyles from "../shell.module.css";
 import styles from "./dashboard.module.css";
 
 /**
@@ -81,31 +74,8 @@ export function DashboardClient({
 
   return (
     <CanvasBackground>
-      <div className={styles.wrap}>
-        <div className={styles.topbar}>
-          <div className={styles.headerRow}>
-            <div className={styles.brandBlock}>
-              <div className={styles.logoMark}>
-                <LogoMark />
-              </div>
-              <div>
-                <p className={styles.appName}>Rescript</p>
-                <p className={styles.tagline}>Your campus, clarified.</p>
-              </div>
-            </div>
-
-            <div className={styles.heroRow}>
-              <div className={styles.heroBadge}>
-                <div className={styles.heroNumber}>{heroCount}</div>
-                <div className={styles.heroSub}>today</div>
-              </div>
-              <div>
-                <p className={styles.greeting}>{formatHeaderDate(now)}</p>
-                <div className={styles.heroLabel}>things need a decision from you today</div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className={shellStyles.wrap}>
+        <AppHeader now={now} heroCount={heroCount} heroLabel="things need a decision from you today" />
 
         {!bannerDismissed && diffSummary.kind !== "no_changes" && (
           <div className={styles.diffbar}>
@@ -133,37 +103,20 @@ export function DashboardClient({
           </div>
         )}
 
-        <div className={styles.tabRow}>
-          <Link href="/student/dashboard" className={`${styles.tab} ${styles.tabActive}`}>
-            <ActionPlanIcon />
-            Action plan
-          </Link>
-          <Link href="/student/dont-miss-this" className={styles.tab}>
-            <StarIcon />
-            Don&apos;t miss this
-          </Link>
-          <Link href="/student/communities" className={styles.tab}>
-            <TwoCirclesIcon />
-            Communities
-          </Link>
-          <Link href="/student/timetable" className={styles.tab}>
-            <CalendarIcon />
-            Timetable
-          </Link>
-        </div>
+        <TabRow active="dashboard" />
 
-        <p className={styles.sectionLabel}>
+        <p className={shellStyles.sectionLabel}>
           <LightningIcon />
           Top priorities
         </p>
 
         {announcements.length === 0 ? (
-          <div className={styles.emptyState}>
+          <div className={shellStyles.emptyState}>
             <h2>You&apos;re all caught up</h2>
             <p>No announcements yet — paste messages to begin.</p>
           </div>
         ) : (
-          <div className={styles.cards}>
+          <div className={shellStyles.cards}>
             {announcements.map((announcement) => (
               <Card
                 key={announcement.id}
