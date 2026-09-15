@@ -389,6 +389,22 @@ create policy "contradictions readable by authenticated users" on contradictions
 -- `create policy` above already shows the corrected, intended state.
 -- ============================================================
 
+-- ============================================================
+-- ADDED — Admin Dashboard pass (see CLAUDE.md's §Admin Dashboard).
+-- `admin_scopes` had RLS enabled with NO select policy at all — flagged
+-- during the login pass (see check-admin-access.ts's own doc comment) but
+-- never addressed since nothing needed to read it through the RLS client
+-- until now: /admin/dashboard reads its own admin's scope_type/class_name/
+-- society_id directly (to decide CR vs Society flow and pre-fill/lock the
+-- scoped value) through the request-scoped client, the same way a student
+-- reads their own profile/timetable — same "own row only" shape as
+-- "read own profile"/"student manages own timetable" above, scoped to
+-- `profile_id = auth.uid()` rather than every row in the table.
+-- ============================================================
+
+create policy "admin reads own scope" on admin_scopes
+  for select using (auth.uid() = profile_id);
+
 
 -- ============================================================
 -- NOTES FOR NEXT STEPS (not SQL — read before wiring the app)

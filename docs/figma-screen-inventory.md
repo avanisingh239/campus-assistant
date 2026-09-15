@@ -303,6 +303,8 @@ Every element in this inventory is categorized into one of five statuses:
 * **Purpose:** Provide scoped administrators an overview of notices they have submitted and quick access to post official updates.
 * **User Role:** Admin (CR or Society Coordinator)
 * **Entry Point:** `/admin/dashboard`
+
+> **As built:** this screen and the three below it (2.3-2.5) are all implemented as one consolidated route, `/admin/dashboard`, adapting to the signed-in admin's own scope rather than four separate routes — same supersession pattern as §1.4's ingestion drawer note. Course Code, Faculty/Teacher name, and Venue/Room (named in 2.3/2.4's field lists below) aren't collected — no matching `announcements` column exists for any of the three. Active notice counters (2.2) aren't built. See CLAUDE.md's §Admin Dashboard for the exact scope this pass covered.
 * **Main Components:**
   * Persistent Verified Scope Badge (`Requirement` — displays EITHER "Class Representative: Section X" OR "Society Coordinator: Club Y")
   * Scope-relevant action button (`Requirement` — "Submit Class Update" for CR; "Submit Society Event" for Society Coordinator)

@@ -76,10 +76,10 @@ The system enforces strictly segregated route trees:
 | `/student/dashboard` | **Source-Required Screen** | Features 2.1, 2.2, 2.3, 4.2, 4.3, 4.5 | Core Action Plan, Priority Feed, "Don't Miss This", and Diff Banner. |
 | `/student/timetable` | **Source-Required Screen** | Features 1.4, 2.4, 2.5 | Weekly schedule, manual entry/edit/delete, and clash/cancellation visualization are all built (see CLAUDE.md §Timetable) — a clash badge (confirmed/possible, reusing the dashboard's own red/amber) with a tap-to-expand popover naming what it clashes with, and a strikethrough + "Cancelled" badge with a linked matched-opportunity note when a free slot has one. No search/category-filter UI beyond the grid itself. |
 | `/student/communities` | **Source-Required Screen** | Feature 4.4 | Dedicated directory for club and society WhatsApp/Telegram join links. |
-| `/admin/dashboard` | **Source-Required Screen** | Features 5.1, 5.2 | Scoped admin overview, active notice counters, and verified scope badge. |
-| `/admin/submit/class` | **Source-Required Screen** | Feature 5.1 | Structured form for class cancellations, reschedules, and room shifts. |
-| `/admin/submit/society`| **Source-Required Screen** | Feature 5.1 | Structured form for workshops, fests, seat counts, and registration links. |
-| `/admin/history` | **Approved Product Decision** | Feature 5.1 feedback | Dedicated log for admins to view their own submitted notices and status. |
+| `/admin/dashboard` | **Source-Required Screen** | Features 5.1, 5.2 | **As built:** the CR and Society Coordinator submission forms, plus submission history, are now all built here — this one route absorbed `/admin/submit/class`, `/admin/submit/society`, and `/admin/history` below rather than each staying a separate route, matching this app's established one-route/internal-state pattern (see CLAUDE.md §Admin Dashboard). Verified scope badge: built. Active-notice counters: not built — not part of the task that built this pass. |
+| `/admin/submit/class` | **Source-Required Screen** | Feature 5.1 | **As built:** superseded — this form now lives at `/admin/dashboard` (see above); this route stays an untouched placeholder. |
+| `/admin/submit/society`| **Source-Required Screen** | Feature 5.1 | **As built:** superseded — this form now lives at `/admin/dashboard` (see above); this route stays an untouched placeholder. |
+| `/admin/history` | **Approved Product Decision** | Feature 5.1 feedback | **As built:** superseded — the admin's own submission history is now a list on `/admin/dashboard` itself (see above); this route stays an untouched placeholder. |
 
 ---
 

@@ -93,6 +93,8 @@ An admin's scope is **assigned, never self-selected** (5.2). One admin may have 
 | `scope_type` | `admin_scope_type` | `class` or `society` |
 | `class_name` | `text` | set when `scope_type = 'class'` |
 | `society_id` | `uuid` FK → `societies` | set when `scope_type = 'society'` |
+
+RLS: `admin reads own scope` — `select` where `auth.uid() = profile_id`, added in the Admin Dashboard pass (⚠️ still pending a live migration — see `CLAUDE.md` §Admin Dashboard). Before this the table had RLS enabled with no policy at all — see §4 below.
 | `created_at` | `timestamptz` | |
 
 RLS is enabled on this table but no policy is defined in `supabase/schema.sql` yet — until one is added, only the service role can read/write it. Don't assume admins can read their own scope client-side; fetch it server-side.
@@ -214,7 +216,7 @@ The most important invariant in the whole schema:
 - **`messages` has a `select` policy but no `insert` policy for the `authenticated` role.** Combined with the comment in `supabase/schema.sql` ("write access restricted to service role ... except admin_form submissions"), this means: **the ingestion pipeline (paste, chat-export, and non-admin-form flows) must write through a service-role Supabase client on the server**, never through the browser/anon client. See `lib/supabase/admin.ts`.
 - Likewise, `announcements`, `announcement_sources`, `contradictions`, `clashes`, and `free_slots` either have no insert policy or only a role-gated one — the deterministic engine and the AI-extraction pipeline both need to run server-side with the service-role client, then let students read the results through the normal `select` policies.
 - Everything under a student's own id (`timetable_entries`, `student_announcement_status`, `clashes`, `free_slots`, `last_seen`) is strictly private to `auth.uid()`.
-- `admin_scopes` has RLS **enabled** but **no policy defined yet** in the live schema — until one is added, only the service role can touch it. Don't build a client-side feature that assumes an authenticated admin can read their own scope directly; go through a server action/route handler. `announcement_sources` and `contradictions` were in the same state until the Student Dashboard pass added a `select`-for-`authenticated` policy to both (⚠️ still pending a live migration — see `CLAUDE.md` §Student Dashboard) — they're metadata on already-public announcements, not private per-user data like `admin_scopes` is, so a broad read policy is the right shape for them, not a server-side-only pattern.
+- `admin_scopes` now has a `select` policy scoped to the admin's own row (`auth.uid() = profile_id`), added in the Admin Dashboard pass — ⚠️ still pending a live migration (see `CLAUDE.md` §Admin Dashboard); until it runs, the live project's `admin_scopes` still has RLS enabled with no policy at all, and only the service role can read it there. `announcement_sources` and `contradictions` went through the same "RLS enabled, no policy" gap until the Student Dashboard pass added a `select`-for-`authenticated` policy to both (also ⚠️ still pending its own live migration — see `CLAUDE.md` §Student Dashboard) — those two are metadata on already-public announcements, not private per-user data like `admin_scopes`, so a broad read policy was the right shape for them, versus `admin_scopes`'s own-row-only policy.
 
 ---
 
