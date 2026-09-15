@@ -72,7 +72,7 @@ export async function ingestRawText(
   const announcementIds: string[] = [];
   const announcements: IngestedAnnouncementSummary[] = [];
   for (const item of extracted) {
-    const row = toAnnouncementRow(item);
+    const row = toAnnouncementRow(item, trimmed);
 
     const { data: announcement, error: announcementError } = await supabase
       .from("announcements")
