@@ -86,6 +86,13 @@ export function AdminAuthForm({ onBack }: { onBack: () => void }) {
             Try a different account
           </Button>
         </div>
+        <button
+          type="button"
+          className={`${styles.backLink} ${styles.backLinkCentered}`}
+          onClick={onBack}
+        >
+          ← Back to role selection
+        </button>
       </PinCard>
     );
   }
