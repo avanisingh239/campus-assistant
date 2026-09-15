@@ -1,0 +1,232 @@
+/*
+ * Shared chrome for every real (non-placeholder) student screen — header
+ * (brand block + date/hero badge), tab row, section label, card grid, and
+ * empty/loading states. Extracted out of
+ * app/student/dashboard/dashboard.module.css, which used to own all of
+ * this, once a second real page (app/student/dont-miss-this) needed the
+ * exact same look — same reasoning as pulling `.site`/`.bgSym` out to
+ * components/canvas-background.tsx during the login pass. Scoped under
+ * app/student/ rather than the top-level components/ because this is
+ * student-shell-specific (tab row, hero badge framing), not the kind of
+ * fully cross-persona primitive components/ui/ holds.
+ *
+ * app/student/dashboard/dashboard.module.css keeps everything actually
+ * specific to one screen: the diff banner (dashboard-only) and every
+ * `.card`/`.pin`/pill/trace-to-source class (used via the shared `Card`
+ * component regardless of which page renders it, so they stay colocated
+ * with card.tsx rather than moving here).
+ */
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== HEADER ===== */
+.topbar {
+  padding: 28px 0 26px;
+}
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.brandBlock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logoMark {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+.appName {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  margin: 0;
+  color: #ffffff;
+}
+.tagline {
+  font-size: 13px;
+  color: #bfe0c4;
+  font-weight: 500;
+  margin: 2px 0 0;
+}
+.greeting {
+  font-size: 12px;
+  color: var(--gold);
+  margin: 0 0 6px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.heroRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.heroBadge {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 3px dashed var(--forest-deep);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-9deg);
+  box-shadow: 5px 5px 0 var(--forest-deep);
+  flex-shrink: 0;
+  animation: badgeWiggle 3.5s ease-in-out infinite;
+}
+@keyframes badgeWiggle {
+  0%,
+  100% {
+    transform: rotate(-9deg);
+  }
+  50% {
+    transform: rotate(-4deg);
+  }
+}
+.heroNumber {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--forest-deep);
+}
+.heroSub {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--forest-deep);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.heroLabel {
+  font-size: 13px;
+  color: #ddf0df;
+  max-width: 160px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+/* ===== TABS ===== */
+.tabRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 26px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #9dc2a2;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 9px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    transform 0.2s var(--bounce),
+    background 0.2s ease,
+    color 0.2s ease;
+  text-decoration: none;
+}
+.tab svg {
+  width: 16px;
+  height: 16px;
+}
+.tab:hover {
+  transform: translateY(-2px);
+}
+.tabActive {
+  background: var(--gold);
+  color: var(--forest-deep);
+  border-color: var(--gold);
+}
+
+.sectionLabel {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold);
+  margin: 0 0 18px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sectionLabel svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ===== CARD GRID ===== */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 34px 26px;
+  padding-bottom: 60px;
+}
+
+/* ===== EMPTY / LOADING STATES ===== */
+.emptyState {
+  text-align: center;
+  padding: 60px 20px;
+  color: #ddf0df;
+}
+.emptyState h2 {
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.loadingCard {
+  background: rgba(255, 255, 255, 0.06);
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  height: 220px;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 640px) {
+  .wrap {
+    padding: 0 16px;
+  }
+  .topbar {
+    padding: 20px 0 18px;
+  }
+  .headerRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .heroRow {
+    width: 100%;
+  }
+  .cards {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}

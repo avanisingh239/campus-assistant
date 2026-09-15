@@ -91,6 +91,8 @@ The reference directory for campus organizations:
 * **Deduplication [Source 4.4]:** Multiple forwarded links for the same club are merged into a single club entry with a badge (*"Posted in 3 groups"*).
 * **Link Safety [Source 4.4]:** URLs are regex-validated; non-standard or suspicious shorteners display a prominent `⚠️ Unverified link` warning.
 
+> **As built:** the MVP pass implements this against `announcements` where `category = 'society_link'` (there's no separate `communities` table in `supabase/schema.sql`), de-duplicated by exact `link_url` match — not grouped/merged by organization name with a "Posted in N groups" badge, which needs the full dedup engine `supabase/schema.sql`'s closing notes still describe as not built (see CLAUDE.md's Core architectural rule section). "Unverified" reuses `announcements.link_verified`, already set by the extraction schema (`docs/ai-contracts.md` §3) when a link looks malformed/suspicious — no separate regex-validation pass runs in this page itself. See CLAUDE.md's §Communities directory.
+
 #### 4. Dashboard Contextual Drawers & Panels (Not Top-Level Pages)
 * **Message Ingestion Drawer (`StudentIngestionDrawer`):** Slide-over triggered from the dashboard containing:
   * **Bulk Paste Box [Source 1.2 - MVP]:** Primary demo flow for pasting 50+ messy chat messages.

@@ -1,11 +1,9 @@
 import { CanvasBackground } from "@/components/canvas-background";
 import shellStyles from "../shell.module.css";
 
-// Next.js's own loading-UI convention — shown automatically while
-// page.tsx's Server Component data fetch is in flight, no client-side
-// spinner state needed. Deliberately lightweight: just enough shimmer to
-// signal "loading," not a full skeleton of every card detail.
-export default function DashboardLoading() {
+// Same convention as app/student/dashboard/loading.tsx and
+// app/student/dont-miss-this/loading.tsx.
+export default function CommunitiesLoading() {
   return (
     <CanvasBackground>
       <div className={shellStyles.wrap}>

@@ -1,0 +1,25 @@
+/*
+ * Communities directory (docs/product-spec.md Area A.3) — a reference
+ * list, not a priority feed, so this deliberately does NOT reuse
+ * app/student/dashboard/card.tsx's `.card`/`.pin`/`.cardCap`/`.urgentTag`
+ * chrome: the pushpin, rotation/stagger animation, category-shadow color,
+ * and urgent ribbon all signal "this needs a decision," which doesn't
+ * apply to a browsable link directory. `.communityCard` here is a plain,
+ * flat card in the same palette instead.
+ *
+ * What DOES carry over untouched is the actual link-chip/trace-to-source
+ * content styling — `.cardBody`/`.cardTitle`/`.cardWhy`/`.linkChip`/
+ * `.unverified`/`.traceToggle`/`.traceSource`/`.srcLabel`, imported
+ * straight from ../dashboard/dashboard.module.css by community-card.tsx,
+ * since that's the exact "already proven, matches the brand" visual
+ * treatment the task asked to reuse — no point redefining those rules
+ * here. The shared grid/header/tabs/empty-state (../shell.module.css)
+ * carry over the same way.
+ */
+
+.communityCard {
+  background: var(--mint-card);
+  border: 3px solid var(--forest-deep);
+  border-radius: 18px;
+  box-shadow: 6px 6px 0 var(--sage);
+}
