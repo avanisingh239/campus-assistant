@@ -5,76 +5,12 @@
  * original as the class-naming translation allows — see icons.tsx and
  * category-meta.ts for the two categories (fyi, uncategorized) the
  * prototype never demonstrated a card for.
+ *
+ * The `.site`/`.bgSym` background-decoration classes that used to live
+ * here moved to components/ui.module.css (see components/canvas-
+ * background.tsx) once /login needed the same backdrop — this file keeps
+ * only what's actually dashboard-specific.
  */
-
-.site {
-  background:
-    radial-gradient(circle at 10% 10%, rgba(109, 151, 115, 0.16) 0, transparent 220px),
-    radial-gradient(circle at 90% 6%, rgba(255, 186, 0, 0.09) 0, transparent 260px),
-    radial-gradient(circle at 70% 60%, rgba(109, 151, 115, 0.12) 0, transparent 260px),
-    radial-gradient(circle at 15% 80%, rgba(255, 186, 0, 0.07) 0, transparent 220px),
-    var(--forest);
-  min-height: 100vh;
-  position: relative;
-  overflow-x: hidden;
-}
-
-.bgSym {
-  position: absolute;
-  opacity: 0.12;
-  color: var(--sage-strong);
-  pointer-events: none;
-  animation: float1 7s ease-in-out infinite;
-  z-index: 0;
-}
-.bgSym svg {
-  width: 100%;
-  height: 100%;
-}
-.s1 {
-  top: 260px;
-  left: 4%;
-  width: 26px;
-  height: 26px;
-  animation-duration: 6s;
-}
-.s2 {
-  top: 180px;
-  right: 6%;
-  width: 30px;
-  height: 30px;
-  color: var(--gold);
-  opacity: 0.16;
-  animation-duration: 8s;
-  animation-delay: 1s;
-}
-.s3 {
-  bottom: 220px;
-  left: 8%;
-  width: 24px;
-  height: 24px;
-  animation-duration: 7.5s;
-  animation-delay: 0.4s;
-}
-.s4 {
-  bottom: 140px;
-  right: 5%;
-  width: 26px;
-  height: 26px;
-  color: var(--gold);
-  opacity: 0.14;
-  animation-duration: 6.5s;
-  animation-delay: 0.8s;
-}
-@keyframes float1 {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-8px) rotate(10deg);
-  }
-}
 
 .wrap {
   max-width: 1180px;

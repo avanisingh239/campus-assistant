@@ -49,13 +49,11 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // /student/login and /admin/login live under the (auth) route group
-  // (app/(auth)/student/login, app/(auth)/admin/login) — they share the
-  // /student and /admin URL prefix but must stay reachable while signed
-  // out, so they're excluded from the protected-route checks below.
-  const isLoginRoute = pathname === "/student/login" || pathname === "/admin/login";
-  const isStudentRoute = pathname.startsWith("/student") && !isLoginRoute;
-  const isAdminRoute = pathname.startsWith("/admin") && !isLoginRoute;
+  // /login (app/(auth)/login) is the only auth entry point now — it lives
+  // in the (auth) route group, so it doesn't share a URL prefix with
+  // /student or /admin and needs no special-case exclusion here.
+  const isStudentRoute = pathname.startsWith("/student");
+  const isAdminRoute = pathname.startsWith("/admin");
 
   if (!isStudentRoute && !isAdminRoute) {
     return response;

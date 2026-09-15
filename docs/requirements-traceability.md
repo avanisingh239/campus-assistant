@@ -57,7 +57,7 @@ The system enforces strictly segregated route trees:
                  ┌──────────────────────┴──────────────────────┐
                  ▼                                             ▼
      ┌────────────────────────┐                   ┌────────────────────────┐
-     │ /student/login         │                   │ /admin/login           │
+     │ /login (student state) │                   │ /login (admin state)  │
      └───────────┬────────────┘                   └───────────┬────────────┘
                  ▼                                             ▼
      ┌────────────────────────┐                   ┌────────────────────────┐
@@ -72,12 +72,10 @@ The system enforces strictly segregated route trees:
 
 | Route | Classification | Supporting Requirement | Notes |
 | :--- | :--- | :--- | :--- |
-| `/login` | **Source-Required Screen** | Feature 6.2 (Two Login Types) | Clean role selection portal. |
-| `/student/login` | **Source-Required Screen** | Feature 6.2 | Dedicated student authentication. |
+| `/login` | **Source-Required Screen** | Feature 6.2 (Two Login Types) | Role selection, plus the student and admin login/signup states — one consolidated route with internal UI state, not separate `/student/login`/`/admin/login` URLs (see CLAUDE.md §Login / role selection). |
 | `/student/dashboard` | **Source-Required Screen** | Features 2.1, 2.2, 2.3, 4.2, 4.3, 4.5 | Core Action Plan, Priority Feed, "Don't Miss This", and Diff Banner. |
 | `/student/timetable` | **Source-Required Screen** | Features 1.4, 2.4, 2.5 | Weekly schedule, manual entry, free-slot display, and clash visualization (all 3 clash types). |
 | `/student/communities` | **Source-Required Screen** | Feature 4.4 | Dedicated directory for club and society WhatsApp/Telegram join links. |
-| `/admin/login` | **Source-Required Screen** | Feature 6.2 | Dedicated administrative authentication for verified CRs & Society Leads. |
 | `/admin/dashboard` | **Source-Required Screen** | Features 5.1, 5.2 | Scoped admin overview, active notice counters, and verified scope badge. |
 | `/admin/submit/class` | **Source-Required Screen** | Feature 5.1 | Structured form for class cancellations, reschedules, and room shifts. |
 | `/admin/submit/society`| **Source-Required Screen** | Feature 5.1 | Structured form for workshops, fests, seat counts, and registration links. |

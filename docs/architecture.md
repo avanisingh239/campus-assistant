@@ -70,9 +70,7 @@ app/
 ├── (public)/
 │   └── page.tsx                         # Public Landing & Overview
 ├── (auth)/
-│   ├── login/page.tsx                   # Role Selection Entry (/login)
-│   ├── student/login/page.tsx           # Student Authentication (/student/login)
-│   └── admin/login/page.tsx             # Admin Authentication (/admin/login)
+│   └── login/page.tsx                   # Role Selection + Student/Admin Auth (/login, one route)
 ├── (student)/
 │   ├── layout.tsx                       # Student Shell (PWA Nav, Offline Banner)
 │   ├── dashboard/page.tsx               # Student Dashboard (Diff, Feeds, Lanes)
@@ -86,6 +84,8 @@ app/
     │   └── society/page.tsx             # Society Coordinator Event Form
     └── history/page.tsx                 # Admin's Own Submission Log
 ```
+
+`(student)`/`(admin)` above are route groups in this original diagram — as built, they're real `student/`/`admin/` folders instead (a parenthesized segment doesn't appear in the URL, and both groups resolved to the same `/dashboard` route otherwise); see CLAUDE.md's §Route tree for the corrected tree. `/login` is also consolidated into one route with internal UI state rather than three (`/login`, `/student/login`, `/admin/login`) — see CLAUDE.md's §Login / role selection.
 
 ### Contextual Drawers & Modals (Component Layer)
 To prevent disorientation, the following live inside `components/` as modals or slide-overs rather than separate pages:

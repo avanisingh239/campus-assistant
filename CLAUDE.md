@@ -113,16 +113,28 @@ Without this, the dashboard still renders — it just shows every card with `sou
 - **Diff banner:** three states (`first_visit`/`no_changes`/`updates`), not two — a returning student with nothing new gets no banner at all, matching product-spec.md's "welcome" framing for first-time-only. `last_seen_at` updates *only* on explicit "Got it" dismissal, never automatically on page load or on a timer, so the banner can't disappear before it's been read. The diff text is scoped to what's actually derivable (new/updated announcements since `last_seen_at`, grouped by category) — it deliberately does not include a "clash resolved" phrase like the prototype's hardcoded example, since nothing tracks clash state *history* to detect a resolution, only current state.
 - **Hero stat ("N things need a decision from you"):** counts engagement-eligible announcements still at `status: 'none'`, not literally "due today" — the dashboard itself is inherently "today's view," and a strict due-today filter would often just show 0.
 
+## Login / role selection (/login)
+
+**`/login` is one consolidated route with internal UI state, not three separate routes.** `docs/product-spec.md`/`docs/figma-screen-inventory.md`/`docs/requirements-traceability.md` describe (and originally this file did too) a `/student/login` and `/admin/login` as their own screens — that's now superseded the same way `docs/architecture.md`'s original route tree was superseded for `student/`/`admin/` (see below): those docs are still right about the *content* of each state, just not about it being a separate URL. `app/(auth)/login/login-screen.tsx` is a client-side state machine over three states, all rendered from the one `/login` page:
+
+- **`role`** (default, landing state for an unauthenticated visitor) — `role-select.tsx`: two large tappable tiles, "I'm a student" / "I'm an admin".
+- **`student`** — `student-auth-form.tsx`: login is the default view within this state; a toggle link switches to a signup form (`full_name`, `class_name`, email, password). Signup calls `supabase.auth.signUp()` passing `role: 'student'`, `full_name`, `class_name` as `options.data` metadata — `handle_new_user()` in `supabase/schema.sql` reads exactly those three keys and creates the `profiles` row itself; this form never inserts into `profiles` directly. If the Supabase project has email confirmation turned on, `signUp()` returns no session and the form shows a "check your email" message instead of redirecting — there was no way to know from this sandbox whether confirmation is on for the live project, so both paths are handled.
+- **`admin`** — `admin-auth-form.tsx`: login only, no signup UI, since an admin's scope is assigned, never self-selected (accounts are provisioned manually — see `scripts/create-test-admin.mjs` below). After a successful `signInWithPassword()`, it calls the `checkAdminAccess()` Server Action (`check-admin-access.ts`), which re-checks `profiles.role === 'admin'` (via the RLS client) and looks up a matching `admin_scopes` row (via the service-role client, since `admin_scopes` has RLS enabled with no policy yet — see §Data model below). No match on either → the form signs the session back out and shows an "Access Restricted" sub-state in place of redirecting, rather than leaving the visitor silently authenticated on the login screen.
+
+All three states share `components/canvas-background.tsx` (the gradient/floating-symbol backdrop) and the `components/ui/` primitives (`PinCard`, `Button`, `TextField`) — pulled out of the Student Dashboard pass specifically so this screen wouldn't duplicate its visual language; see `components/icons.tsx` for the same move applied to the base icon set (dashboard's own `app/student/dashboard/icons.tsx` now only holds the dashboard-specific `CategoryIcon` mapping). The dashboard's own `Card` component was deliberately *not* generalized onto `PinCard` — its category-driven, animated, multi-state behavior is real complexity specific to that screen, and the login tiles/form container don't need any of it.
+
+Validation uses `zod` (already a dependency, see `lib/ai/extraction-schema.ts`) rather than a new form library — plain controlled inputs plus the schemas in `app/(auth)/login/validation.ts`. Auth calls go through the browser client (`lib/supabase/client.ts`) only; nothing in `app/(auth)/login/` touches the server or admin client except `check-admin-access.ts`'s Server Action.
+
 ## Route tree & persona isolation
 
 ```
 app/
 ├── (public)/page.tsx                    # "/" — public landing
-├── (auth)/
-│   ├── login/page.tsx                   # "/login" — role selector
-│   ├── student/login/page.tsx           # "/student/login"
-│   ├── admin/login/page.tsx             # "/admin/login"
-│   └── login-form.tsx                   # shared client form (not a route)
+├── (auth)/login/                        # "/login" — ONE route, internal state, see above
+│   ├── page.tsx, login-screen.tsx, role-select.tsx
+│   ├── student-auth-form.tsx, admin-auth-form.tsx
+│   ├── check-admin-access.ts            # Server Action
+│   ├── validation.ts (+.test.ts), login.module.css
 ├── (dev)/ingest-test/page.tsx           # "/ingest-test" — TEMPORARY, see above
 ├── (dev)/clash-test/page.tsx            # "/clash-test" — TEMPORARY, see §Deterministic engine
 ├── student/                             # REAL folder — see note below
@@ -135,11 +147,13 @@ app/
 ├── layout.tsx, globals.css, register-service-worker.tsx, sign-out-button.tsx
 ```
 
+`components/` (new as of the login pass) holds cross-screen UI: `icons.tsx` (base SVG shapes + `LogoMark`, `CategoryIcon` stays in `app/student/dashboard/icons.tsx` since it's dashboard-specific), `canvas-background.tsx` (the gradient/floating-symbol backdrop, `.site`/`.bgSym` moved here from `app/student/dashboard/dashboard.module.css`), `ui.module.css` + `ui/pin-card.tsx`/`ui/button.tsx`/`ui/text-field.tsx` (the generic card/button/field shapes both `/login` and the dashboard's chrome are built from).
+
 **`student/` and `admin/` are real path segments, not `(student)`/`(admin)` route groups.** `docs/architecture.md`'s original route-tree diagram wrote them as groups, but a parenthesized segment is stripped from the URL — `(student)/dashboard/page.tsx` and `(admin)/dashboard/page.tsx` both resolved to `/dashboard` and collided (caught by `next build`, not `tsc`). They need to be real folders both because the URLs must actually start with `/student`/`/admin` (that's what `middleware.ts` pattern-matches on) and because the dashboards need distinct URLs from each other. `(auth)`, `(public)`, and `(dev)` are legitimately route groups — those are cases where the group name should *not* appear in the URL.
 
-`middleware.ts` (via `lib/supabase/middleware.ts`) refreshes the Supabase session on every request and enforces role separation from `profiles.role`: unauthenticated → redirect to `/login`; wrong role on `/student/*` or `/admin/*` → HTTP 403. `/student/login` and `/admin/login` are explicitly excluded from that check (they share the URL prefix with the protected dashboards but must stay reachable while signed out).
+`middleware.ts` (via `lib/supabase/middleware.ts`) refreshes the Supabase session on every request and enforces role separation from `profiles.role`: unauthenticated → redirect to `/login`; wrong role on `/student/*` or `/admin/*` → HTTP 403. `/login` needs no exclusion from that check — it lives under `(auth)`, a route group, so its URL is just `/login` and was never matched by the `/student`/`/admin` prefix check in the first place.
 
-Admin accounts are **manually provisioned** — there's no signup flow for the `admin` role; `handle_new_user()` in `supabase/schema.sql` defaults every new signup to `role = 'student'`.
+Admin accounts are **manually provisioned** — there's no signup flow for the `admin` role; `handle_new_user()` in `supabase/schema.sql` defaults every new signup to `role = 'student'`. `scripts/create-test-admin.mjs` creates one via `supabase.auth.admin.createUser()` (service-role) for local testing.
 
 ## Data & privacy model (Supabase/Postgres)
 

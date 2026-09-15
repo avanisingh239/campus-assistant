@@ -5,7 +5,8 @@ import type { DashboardAnnouncement } from "@/lib/dashboard/types";
 import type { EngagementStatus } from "@/lib/deterministic/types";
 import { CATEGORY_LABELS, supportsEngagementToggle } from "@/lib/dashboard/category-meta";
 import { formatCapMeta, splitVerb, formatRelativeTimeCaps } from "@/lib/dashboard/format";
-import { CategoryIcon, WarningCircleIcon, ArrowMergeIcon, ChainLinkIcon } from "./icons";
+import { WarningCircleIcon, ArrowMergeIcon, ChainLinkIcon } from "@/components/icons";
+import { CategoryIcon } from "./icons";
 import { confettiBurst } from "./confetti";
 import styles from "./dashboard.module.css";
 

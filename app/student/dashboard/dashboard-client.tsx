@@ -16,10 +16,10 @@ import {
   StarIcon,
   TwoCirclesIcon,
   CalendarIcon,
-  ChatBubbleIcon,
   ActionPlanIcon,
   LightningIcon,
-} from "./icons";
+} from "@/components/icons";
+import { CanvasBackground } from "@/components/canvas-background";
 import styles from "./dashboard.module.css";
 
 /**
@@ -80,20 +80,7 @@ export function DashboardClient({
   }
 
   return (
-    <div className={styles.site}>
-      <div className={`${styles.bgSym} ${styles.s1}`}>
-        <StarIcon />
-      </div>
-      <div className={`${styles.bgSym} ${styles.s2}`}>
-        <TwoCirclesIcon />
-      </div>
-      <div className={`${styles.bgSym} ${styles.s3}`}>
-        <CalendarIcon />
-      </div>
-      <div className={`${styles.bgSym} ${styles.s4}`}>
-        <ChatBubbleIcon />
-      </div>
-
+    <CanvasBackground>
       <div className={styles.wrap}>
         <div className={styles.topbar}>
           <div className={styles.headerRow}>
@@ -189,6 +176,6 @@ export function DashboardClient({
           </div>
         )}
       </div>
-    </div>
+    </CanvasBackground>
   );
 }

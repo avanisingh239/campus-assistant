@@ -207,8 +207,8 @@ Every student-facing card must render these standardized fields:
 
 #### 1. Authentication & Role Segregation [Approved Product Decision]
 * Entry route: `/login` presents a role selection screen:
-  * **Student Login Button** $\rightarrow$ navigates to `/student/login`.
-  * **Admin Login Button** $\rightarrow$ navigates to `/admin/login`.
+  * **Student Login Button** $\rightarrow$ the student login/signup state of `/login` (implemented as internal UI state on the one route, not a separate `/student/login` URL — see CLAUDE.md §Login / role selection).
+  * **Admin Login Button** $\rightarrow$ the admin login state of `/login`, same route (not a separate `/admin/login` URL).
 * Post-authentication redirects:
   * Student $\rightarrow$ `/student/dashboard`.
   * Admin $\rightarrow$ `/admin/dashboard`.

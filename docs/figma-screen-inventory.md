@@ -22,7 +22,7 @@ Every element in this inventory is categorized into one of five statuses:
 ### 1.1 Student Login
 * **Purpose:** Authenticate students securely into their personal dashboard.
 * **User Role:** Student
-* **Entry Point:** `/login` (Role Selection) $\rightarrow$ `/student/login`
+* **Entry Point:** `/login` (Role Selection) $\rightarrow$ the student state of `/login` — implemented as one consolidated route with internal UI state rather than a separate `/student/login` URL; see CLAUDE.md §Login / role selection.
 * **Main Components:**
   * Campus Assistant branding (`Requirement`)
   * "Student Portal" heading/label (`Requirement`)
@@ -278,7 +278,7 @@ Every element in this inventory is categorized into one of five statuses:
 ### 2.1 Admin Login
 * **Purpose:** Authenticate verified Class Representatives and Society Coordinators into their scoped administrative portal.
 * **User Role:** Admin
-* **Entry Point:** `/login` $\rightarrow$ `/admin/login`
+* **Entry Point:** `/login` $\rightarrow$ the admin state of `/login` — implemented as one consolidated route with internal UI state rather than a separate `/admin/login` URL; see CLAUDE.md §Login / role selection.
 * **Main Components:**
   * Admin Portal badge/heading (`Requirement`)
   * Email and Password input fields (`Requirement`)
