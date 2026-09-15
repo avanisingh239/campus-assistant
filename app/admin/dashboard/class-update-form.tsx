@@ -76,7 +76,7 @@ export function ClassUpdateForm({
     <div className="card">
       <h2>Submit a class update</h2>
       <form onSubmit={handleSubmit} noValidate>
-        <TextField id="class-name" label="Class" value={className} disabled readOnly />
+        <TextField id="class-name" label="Class" value={className} disabled readOnly labelClassName={styles.fieldLabel} />
 
         <TextField
           id="section"
@@ -84,6 +84,7 @@ export function ClassUpdateForm({
           value={form.section}
           onChange={(e) => update("section", e.target.value)}
           error={fieldErrors.section}
+          labelClassName={styles.fieldLabel}
         />
         <TextField
           id="course_name"
@@ -91,6 +92,7 @@ export function ClassUpdateForm({
           value={form.course_name}
           onChange={(e) => update("course_name", e.target.value)}
           error={fieldErrors.course_name}
+          labelClassName={styles.fieldLabel}
         />
 
         <fieldset className={styles.radioGroup}>
@@ -116,6 +118,7 @@ export function ClassUpdateForm({
           value={form.event_date}
           onChange={(e) => update("event_date", e.target.value)}
           error={fieldErrors.event_date}
+          labelClassName={styles.fieldLabel}
         />
 
         <div className={styles.timeRow}>
@@ -126,6 +129,7 @@ export function ClassUpdateForm({
             value={form.start_time}
             onChange={(e) => update("start_time", e.target.value)}
             error={fieldErrors.start_time}
+            labelClassName={styles.fieldLabel}
           />
           <TextField
             id="end_time"
@@ -134,6 +138,7 @@ export function ClassUpdateForm({
             value={form.end_time}
             onChange={(e) => update("end_time", e.target.value)}
             error={fieldErrors.end_time}
+            labelClassName={styles.fieldLabel}
           />
         </div>
 

@@ -12,8 +12,11 @@ export const dynamic = "force-dynamic";
  * adapts to the signed-in admin's own `admin_scopes` row, matching the
  * consolidation pattern already used for /login, /student/timetable, and
  * /student/ingest instead of building /admin/submit/class,
- * /admin/submit/society, and /admin/history as separate routes (those
- * three stay untouched placeholders — see CLAUDE.md's §Admin Dashboard).
+ * /admin/submit/society, and /admin/history as separate routes. Those
+ * three started out as untouched placeholders once this page absorbed
+ * their functionality, and were later deleted outright (along with their
+ * admin-nav links) once that made them pure dead ends — see CLAUDE.md's
+ * §Admin Dashboard.
  *
  * Reads `admin_scopes` through the RLS-respecting client now that
  * "admin reads own scope" exists (supabase/schema.sql) — this table had

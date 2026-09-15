@@ -77,7 +77,7 @@ export function SocietyUpdateForm({
     <div className="card">
       <h2>Submit a society / event update</h2>
       <form onSubmit={handleSubmit} noValidate>
-        <TextField id="society-name" label="Society" value={societyName} disabled readOnly />
+        <TextField id="society-name" label="Society" value={societyName} disabled readOnly labelClassName={styles.fieldLabel} />
 
         <TextField
           id="title"
@@ -85,6 +85,7 @@ export function SocietyUpdateForm({
           value={form.title}
           onChange={(e) => update("title", e.target.value)}
           error={fieldErrors.title}
+          labelClassName={styles.fieldLabel}
         />
 
         <TextField
@@ -94,6 +95,7 @@ export function SocietyUpdateForm({
           value={form.event_date}
           onChange={(e) => update("event_date", e.target.value)}
           error={fieldErrors.event_date}
+          labelClassName={styles.fieldLabel}
         />
 
         <div className={styles.timeRow}>
@@ -104,6 +106,7 @@ export function SocietyUpdateForm({
             value={form.start_time}
             onChange={(e) => update("start_time", e.target.value)}
             error={fieldErrors.start_time}
+            labelClassName={styles.fieldLabel}
           />
           <TextField
             id="end_time"
@@ -112,6 +115,7 @@ export function SocietyUpdateForm({
             value={form.end_time}
             onChange={(e) => update("end_time", e.target.value)}
             error={fieldErrors.end_time}
+            labelClassName={styles.fieldLabel}
           />
         </div>
 
@@ -133,6 +137,7 @@ export function SocietyUpdateForm({
             value={form.seat_count}
             onChange={(e) => update("seat_count", e.target.value)}
             error={fieldErrors.seat_count}
+            labelClassName={styles.fieldLabel}
           />
         )}
 
@@ -143,6 +148,7 @@ export function SocietyUpdateForm({
           value={form.deadline_at}
           onChange={(e) => update("deadline_at", e.target.value)}
           error={fieldErrors.deadline_at}
+          labelClassName={styles.fieldLabel}
         />
 
         <TextField
@@ -153,6 +159,7 @@ export function SocietyUpdateForm({
           value={form.link_url}
           onChange={(e) => update("link_url", e.target.value)}
           error={fieldErrors.link_url}
+          labelClassName={styles.fieldLabel}
         />
 
         <Button type="submit" disabled={submitting}>
