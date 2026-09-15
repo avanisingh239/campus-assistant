@@ -10,8 +10,10 @@ import { createServerClient } from "@supabase/ssr";
  *
  * Server Components can't set cookies, so the `setAll` call below is
  * wrapped in a try/catch — that's expected there and harmless as long as
- * `middleware.ts` is refreshing the session on every request (see
- * lib/supabase/middleware.ts).
+ * `middleware.ts` (at the repo root) is refreshing the session cookie on
+ * every request; that logic is inlined directly in `middleware.ts` itself,
+ * not a separate module, so it can't be broken by import resolution in
+ * Vercel's middleware bundling.
  */
 export async function createClient() {
   const cookieStore = await cookies();
