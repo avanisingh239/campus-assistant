@@ -1,0 +1,119 @@
+/*
+ * Timetable-specific chrome. Deliberately no pushpin/card-cap treatment
+ * (see CLAUDE.md's §Timetable) — that visual language is specific to the
+ * dashboard's announcement `Card`, and doesn't apply to a form or a plain
+ * weekly grid. `.formCard` is a flat bordered box in the same palette,
+ * not `components/ui/pin-card.tsx`'s `PinCard`.
+ */
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+
+/* Overrides components/ui.module.css's `.button { width: 100% }` so
+   multiple buttons can sit side by side instead of each claiming a full
+   row — Button's className prop merges with its own base classes. */
+.actionButton {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 160px;
+}
+
+/* ===== WEEKLY GRID ===== */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  padding-bottom: 60px;
+}
+
+.dayColumn {
+  min-width: 0;
+}
+.dayHeader {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gold);
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.dayEmpty {
+  font-size: 12px;
+  color: #9dc2a2;
+  font-style: italic;
+  margin: 0;
+}
+
+.entryBlock {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--mint-card);
+  border: 2.5px solid var(--forest-deep);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  font: inherit;
+  transition: transform 0.15s var(--bounce);
+}
+.entryBlock:hover {
+  transform: translateY(-2px);
+  box-shadow: 3px 3px 0 var(--sage);
+}
+.entryBlock:active {
+  transform: scale(0.97);
+}
+.entryCourse {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--forest);
+  margin: 0 0 3px;
+}
+.entryTime {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 0;
+}
+.entryMeta {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin: 4px 0 0;
+}
+
+/* ===== FORM ===== */
+.formCard {
+  background: var(--mint-card);
+  border: 3px solid var(--forest-deep);
+  border-radius: 18px;
+  box-shadow: 6px 6px 0 var(--sage);
+  padding: 22px;
+  max-width: 480px;
+  margin-bottom: 60px;
+}
+.formHeading {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--forest);
+  margin: 0 0 18px;
+}
+.timeRow {
+  display: flex;
+  gap: 12px;
+}
+.timeRow > * {
+  flex: 1;
+  min-width: 0;
+}
+.formActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}

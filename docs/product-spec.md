@@ -85,6 +85,8 @@ The ground-truth schedule repository:
   3. **Event vs. Event** (e.g., two registered extracurricular workshops overlapping).
 * **AI OCR Upload Modal [Source 1.4 - Phase 2 — Deferred but Committed]:** Upload syllabus/schedule image or PDF. Deferred to Phase 2 to ensure zero-hallucination accuracy across varied layout templates. Any unconfirmed OCR extraction is explicitly labeled *"Please confirm"* before saving.
 
+> **As built:** the Timetable Grid and Manual Entry Form (including edit/delete) are real, wired to `lib/timetable/actions.ts` — every mutation triggers real clash detection. The Cancelled-Class & Free-Slot Display and Clash Visualization bullets above describe UI this pass doesn't render: the underlying `free_slots`/`clashes` data is genuinely computed and correct (verify via `/clash-test`), just not shown on this page yet. The OCR Upload Modal stays a disabled "coming soon" button, exactly matching this doc's own `Deferred but Committed` tag. See CLAUDE.md's §Timetable.
+
 #### 3. Student Communities (`/student/communities`)
 The reference directory for campus organizations:
 * **Group Link Directory [Source 4.4]:** Dedicated tab/view grouping club and society WhatsApp/Telegram join links by organization.
