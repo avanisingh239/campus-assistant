@@ -94,6 +94,27 @@ export default async function StudentDashboardPage() {
     messageRows ?? [],
   );
 
+  // Stat row + free-slot spotlight (see CLAUDE.md's §Student Dashboard for
+  // the four-element follow-up pass this is part of). Both tables have a
+  // "student reads own ___" SELECT policy — same RLS client, no admin
+  // client needed to read them, only to write them (lib/deterministic/sync.ts).
+  const [clashesResult, freeSlotsResult] = await Promise.all([
+    supabase.from("clashes").select("id, clash_type, announcement_id, other_announcement_id, severity").eq("student_id", user.id),
+    supabase
+      .from("free_slots")
+      .select("id, timetable_entry_id, cancellation_announcement_id, matched_announcement_id, status, created_at")
+      .eq("student_id", user.id)
+      .not("matched_announcement_id", "is", null)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (clashesResult.error) {
+    throw new Error(`Failed to load clashes: ${clashesResult.error.message}`);
+  }
+  if (freeSlotsResult.error) {
+    throw new Error(`Failed to load free slots: ${freeSlotsResult.error.message}`);
+  }
+
   const now = new Date();
   const urgentId = pickUrgentAnnouncementId(announcements, now);
   const diffSummary = buildDiffSummary(announcements, lastSeenResult.data?.last_seen_at ?? null);
@@ -104,6 +125,8 @@ export default async function StudentDashboardPage() {
       urgentId={urgentId}
       diffSummary={diffSummary}
       nowIso={now.toISOString()}
+      clashes={clashesResult.data ?? []}
+      freeSlots={freeSlotsResult.data ?? []}
     />
   );
 }

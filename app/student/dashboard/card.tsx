@@ -65,7 +65,7 @@ export function Card({
   }
 
   return (
-    <div className={styles.card} data-category={announcement.category}>
+    <div id={`announcement-${announcement.id}`} className={styles.card} data-category={announcement.category}>
       <div className={styles.pin} />
       <div className={styles.cardCap}>
         <div className={styles.iconChip}>

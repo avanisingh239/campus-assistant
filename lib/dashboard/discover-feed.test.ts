@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDiscoverFeed } from "./discover-feed";
+import { buildDiscoverFeed, isDiscoveryWorthy } from "./discover-feed";
 import type { DashboardAnnouncement } from "./types";
 
 function announcement(overrides: Partial<DashboardAnnouncement> = {}): DashboardAnnouncement {
@@ -78,5 +78,29 @@ describe("buildDiscoverFeed", () => {
     const inputCopy = [...input];
     buildDiscoverFeed(input);
     expect(input).toEqual(inputCopy);
+  });
+});
+
+describe("isDiscoveryWorthy", () => {
+  it("is true for any opportunity", () => {
+    expect(isDiscoveryWorthy(announcement({ category: "opportunity" }))).toBe(true);
+  });
+
+  it("is true for an event with a concrete seat_count", () => {
+    expect(isDiscoveryWorthy(announcement({ category: "event", seat_count: 20 }))).toBe(true);
+  });
+
+  it("is true for an event with seats_unclear", () => {
+    expect(isDiscoveryWorthy(announcement({ category: "event", seats_unclear: true }))).toBe(true);
+  });
+
+  it("is false for a plain event with no seat information", () => {
+    expect(isDiscoveryWorthy(announcement({ category: "event" }))).toBe(false);
+  });
+
+  it("is false for every other category", () => {
+    expect(isDiscoveryWorthy(announcement({ category: "deadline" }))).toBe(false);
+    expect(isDiscoveryWorthy(announcement({ category: "cancellation" }))).toBe(false);
+    expect(isDiscoveryWorthy(announcement({ category: "society_link" }))).toBe(false);
   });
 });
