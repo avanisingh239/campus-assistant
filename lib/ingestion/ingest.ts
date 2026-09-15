@@ -30,6 +30,16 @@ import type { IngestOptions, IngestResult, IngestedAnnouncementSummary } from ".
  * produce a class_vs_event/event_vs_event clash the moment it's created
  * (both are gated on interested/registered). Clash detection's real
  * trigger points are lib/timetable/actions.ts and lib/engagement/actions.ts.
+ *
+ * Also resolves `messages.submitted_by_class_name` — the announcements RLS
+ * policy's real matching key (supabase/schema.sql) — from a fresh
+ * `profiles.class_name` lookup keyed off `options.submittedBy`, never from
+ * a caller-supplied value. See the lookup right below for why this can't
+ * be spoofed the way a plain option could, and supabase/schema.sql's
+ * "class-scoping / display-label split" migration note for the bug this
+ * replaced (`source_group_name`, a free-text display label, was never the
+ * same shape of data as `profiles.class_name` and was being used to gate
+ * visibility anyway).
  */
 export async function ingestRawText(
   rawText: string,
@@ -42,6 +52,27 @@ export async function ingestRawText(
 
   const supabase = createAdminClient();
 
+  // Server-derived RLS matching key (supabase/schema.sql's "class-scoping /
+  // display-label split" migration note) — deliberately NOT taken from
+  // `options`. `source_group_name` below stays whatever free text the
+  // caller passed (a display label only); `submitted_by_class_name` is a
+  // fresh read of the submitting student's own `profiles.class_name`,
+  // looked up here rather than trusted from any caller-supplied value, so
+  // it can never be spoofed by tampering with a client-side call. Stays
+  // null when there's no `submittedBy` at all — the known, documented case
+  // being the WhatsApp bot webhook, which has no authenticated student
+  // session to derive a class from (see CLAUDE.md's §Admin Dashboard
+  // section list / the schema migration note for the full reasoning).
+  let submittedByClassName: string | null = null;
+  if (options.submittedBy) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("class_name")
+      .eq("id", options.submittedBy)
+      .maybeSingle();
+    submittedByClassName = (profile?.class_name as string | null) ?? null;
+  }
+
   // 1. Store the raw message immutably (ai-contracts.md Contract 2: ready -> processing)
   const { data: message, error: messageError } = await supabase
     .from("messages")
@@ -49,6 +80,7 @@ export async function ingestRawText(
       raw_text: trimmed,
       source_type: options.sourceType ?? "paste",
       source_group_name: options.sourceGroupName ?? null,
+      submitted_by_class_name: submittedByClassName,
       submitted_by: options.submittedBy ?? null,
     })
     .select("id")

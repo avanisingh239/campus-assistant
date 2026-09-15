@@ -175,6 +175,76 @@ describe("detectEventVsEventClashes (rule 3)", () => {
     ]);
     expect(detectEventVsEventClashes([eventA, eventC], engagement)).toHaveLength(0);
   });
+
+  it("clashes a 'registered_update' against a plain 'event' — a real reported bug where this was suspected (wrongly) to be excluded by category", () => {
+    // Real scenario: "Maths Class Rescheduled" (registered_update) vs.
+    // "Synergy Orientation" (event), both marked Registered/Interested,
+    // overlapping times. CLASH_ELIGIBLE_CATEGORIES already includes
+    // registered_update, so this always worked — this test locks that in
+    // rather than leaving it as an untested assumption.
+    const mathsRescheduled = announcement({
+      id: "maths",
+      category: "registered_update",
+      event_date: "2026-09-22",
+      start_time: "11:00",
+      end_time: "12:00",
+    });
+    const synergyOrientation = announcement({
+      id: "synergy",
+      category: "event",
+      event_date: "2026-09-22",
+      start_time: "11:00",
+      end_time: "13:00",
+    });
+    const engagement = new Map<string, EngagementStatus>([
+      ["maths", "registered"],
+      ["synergy", "interested"],
+    ]);
+
+    const clashes = detectEventVsEventClashes([mathsRescheduled, synergyOrientation], engagement);
+    expect(clashes).toHaveLength(1);
+    expect(clashes[0]).toMatchObject({
+      clash_type: "event_vs_event",
+      announcement_id: "maths",
+      other_announcement_id: "synergy",
+      severity: "confirmed",
+    });
+  });
+
+  it("does NOT clash two otherwise-overlapping announcements whose event_date differs — the real-world footgun behind the reported bug", () => {
+    // If two messages describing the same intended day ("next Tuesday")
+    // are ingested on different calendar days, Gemini resolves each one
+    // against ITS OWN ingestion-time "today" (lib/ai/extract.ts's
+    // buildSystemPrompt(now)) and can legitimately store two different
+    // absolute event_date values for what a person would call "the same
+    // day." This is correct, non-guessing extraction behavior, not a
+    // clash-detection bug — but it's the most likely explanation when a
+    // clash "should" fire and doesn't: the dates just don't match. This
+    // test documents that this function's own date-equality check is
+    // exactly the reason, not evidence of a bug in the check itself.
+    const mathsRescheduled = announcement({
+      id: "maths",
+      category: "registered_update",
+      event_date: "2026-09-22",
+      start_time: "11:00",
+      end_time: "12:00",
+    });
+    const synergyOrientationDifferentWeek = announcement({
+      id: "synergy",
+      category: "event",
+      event_date: "2026-09-29", // "next Tuesday" resolved a week later
+      start_time: "11:00",
+      end_time: "13:00",
+    });
+    const engagement = new Map<string, EngagementStatus>([
+      ["maths", "registered"],
+      ["synergy", "interested"],
+    ]);
+
+    expect(
+      detectEventVsEventClashes([mathsRescheduled, synergyOrientationDifferentWeek], engagement),
+    ).toHaveLength(0);
+  });
 });
 
 describe("severity rule (rule 4) across both event-based clash types", () => {
