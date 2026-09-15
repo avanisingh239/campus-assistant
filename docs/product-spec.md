@@ -85,7 +85,7 @@ The ground-truth schedule repository:
   3. **Event vs. Event** (e.g., two registered extracurricular workshops overlapping).
 * **AI OCR Upload Modal [Source 1.4 - Phase 2 — Deferred but Committed]:** Upload syllabus/schedule image or PDF. Deferred to Phase 2 to ensure zero-hallucination accuracy across varied layout templates. Any unconfirmed OCR extraction is explicitly labeled *"Please confirm"* before saving.
 
-> **As built:** the Timetable Grid and Manual Entry Form (including edit/delete) are real, wired to `lib/timetable/actions.ts` — every mutation triggers real clash detection. The Cancelled-Class & Free-Slot Display and Clash Visualization bullets above describe UI this pass doesn't render: the underlying `free_slots`/`clashes` data is genuinely computed and correct (verify via `/clash-test`), just not shown on this page yet. The OCR Upload Modal stays a disabled "coming soon" button, exactly matching this doc's own `Deferred but Committed` tag. See CLAUDE.md's §Timetable.
+> **As built:** the Timetable Grid and Manual Entry Form (including edit/delete) are real, wired to `lib/timetable/actions.ts` — every mutation triggers real clash detection. The Cancelled-Class & Free-Slot Display and Clash Visualization bullets above are now also real, in a form scoped to what a follow-up task actually asked for: a clash badge (confirmed = red, possible = amber, reusing the dashboard's own colors) that expands on tap to name what it clashes with, and a strikethrough + "Cancelled" badge with an inline matched-opportunity note (not a separate emerald "Free Slot" card). The OCR Upload Modal stays a disabled "coming soon" button, exactly matching this doc's own `Deferred but Committed` tag. See CLAUDE.md's §Timetable.
 
 #### 3. Student Communities (`/student/communities`)
 The reference directory for campus organizations:
@@ -100,6 +100,8 @@ The reference directory for campus organizations:
   * **Bulk Paste Box [Source 1.2 - MVP]:** Primary demo flow for pasting 50+ messy chat messages.
   * **WhatsApp Chat Export Upload [Source 1.3 - MVP]:** File uploader for official `.txt` exports, stripping system notices.
   * **Web Share Target [Source 1.1 - Phase 2 — Deferred but Committed]:** OS-level share receiver; deferred to Phase 2 due to mobile browser OS variations (specifically iOS Safari limitations) while Bulk Paste provides universal MVP coverage.
+
+  > **As built:** implemented as its own tab/route, `/student/ingest`, not a dashboard slide-over — same supersession as the "Don't Miss This" lane below. Bulk Paste and WhatsApp `.txt` Upload are both real; Web Share Target is a visibly disabled "Coming soon" tile, matching this doc's own Phase-2 tag for it. See CLAUDE.md's §Ingestion page.
 * **Trace-to-Source Drawer (`TraceToSourceDrawer`) [Source 3.3]:** Slide-over triggered by tapping any announcement card, displaying verbatim raw text, sender, timestamp, and batch ID.
 * **Contradiction Callout (`ContradictionBanner`) [Source 3.2]:** In-card warning banner displaying conflicting details across merged sources (e.g., *"Source A says Room 201; Source B says Room 304"*).
 * **Confidence Explainer (`ConfidenceBadge`) [Source 2.7]:** In-card badge (`✅ Clear`, `⚠️ Partially clear`, `❓ Unclear`) with an interactive popover explaining what information is missing.

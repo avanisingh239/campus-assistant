@@ -73,7 +73,7 @@ Every element in this inventory is categorized into one of five statuses:
 ---
 
 ### 1.3 Timetable
-* **As built (this MVP pass):** the weekly grid, manual add/edit/delete form, and empty state are real — see CLAUDE.md's §Timetable. Not built this pass: the configurable week-display setting below (the task explicitly called this out of scope for the hackathon — `day_of_week` defaults to a fixed Monday–Saturday view, still showing any entry outside that range rather than dropping it), the cancelled-class strikethrough, the free-slot indicator card, and any in-page clash-visualization indicator (clash detection itself fires correctly on every add/edit/delete — see `lib/timetable/actions.ts` — it's only the on-page display of that data that isn't built yet). Image/PDF upload is a disabled "coming soon" button — see CLAUDE.md for why that one's explicitly deferred rather than attempted.
+* **As built (this MVP pass):** the weekly grid, manual add/edit/delete form, empty state, and clash/cancellation visualization (clash badge with tap-to-expand detail, cancelled-class strikethrough + matched-opportunity note) are all real — see CLAUDE.md's §Timetable. Not built: the configurable week-display setting below (the task explicitly called this out of scope for the hackathon — `day_of_week` defaults to a fixed Monday–Saturday view, still showing any entry outside that range rather than dropping it) and a dedicated "Free Slot" card UI beyond the inline note. Image/PDF upload is a disabled "coming soon" button — see CLAUDE.md for why that one's explicitly deferred rather than attempted.
 * **Purpose:** Weekly ground-truth schedule repository for classes, clash visualization, and free-slot discovery.
 * **User Role:** Student
 * **Entry Point:** `/student/timetable`
@@ -379,6 +379,8 @@ Every element in this inventory is categorized into one of five statuses:
 ---
 
 ## 3. System States Inventory (13 States)
+
+> **As built (§3.1-3.9):** these 9 ingestion states are real on `/student/ingest` (see CLAUDE.md's §Ingestion page), not a `StudentIngestionDrawer` slide-over — same tab/route supersession as elsewhere in this app. 5 of the 9 are built: Empty/Ready/Processing are just this page's own screen state, and Successfully Parsed / Partially Parsed / Needs Clarification / Unsupported Format / Failed are real result states (`lib/ingestion/result-state.ts`). Duplicate Input (§3.7) is **not built** — it needs the dedup engine `supabase/schema.sql`'s closing notes still describe as not existing. Needs Clarification (§3.6) here means "every extracted item in the run came back `confidence: unclear`," not a separate manual Uncategorized-bucket review flow — a lone unclear item within an otherwise-fine batch is shown inline instead of gating the whole result.
 
 ### 3.1 Empty State
 * **Purpose:** Welcome student when zero announcements exist and guide initial ingestion.

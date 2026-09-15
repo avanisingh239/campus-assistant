@@ -50,16 +50,11 @@
 }
 
 .entryBlock {
-  display: block;
-  width: 100%;
-  text-align: left;
   background: var(--mint-card);
   border: 2.5px solid var(--forest-deep);
   border-radius: 12px;
   padding: 10px 12px;
   margin-bottom: 10px;
-  cursor: pointer;
-  font: inherit;
   transition: transform 0.15s var(--bounce);
 }
 .entryBlock:hover {
@@ -67,13 +62,32 @@
   box-shadow: 3px 3px 0 var(--sage);
 }
 .entryBlock:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
+}
+/* The click target for opening the edit form — a plain-reset button
+   wrapping just the course/time text, not the whole block (the clash
+   badge below needs its own independent button, and a <button> can't
+   contain another <button> — see entry-block.tsx's doc comment). */
+.entryMain {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font: inherit;
 }
 .entryCourse {
   font-size: 13.5px;
   font-weight: 700;
   color: var(--forest);
   margin: 0 0 3px;
+}
+.entryCourseCancelled {
+  text-decoration: line-through;
+  color: var(--ink-faint);
 }
 .entryTime {
   font-size: 12px;
@@ -84,6 +98,85 @@
   font-size: 11px;
   color: var(--ink-faint);
   margin: 4px 0 0;
+}
+
+/* ===== CANCELLED / FREE SLOT ===== */
+.cancelledRow {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1.5px dashed var(--tag-cancel-bg);
+}
+.cancelledBadge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--tag-cancel-bg);
+  color: var(--tag-cancel);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.matchedNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--tag-opportunity);
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+.matchedNote svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ===== CLASH BADGE ===== */
+.clashSection {
+  margin-top: 8px;
+}
+.clashBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.clashBadge svg {
+  width: 12px;
+  height: 12px;
+}
+.clashBadgeConfirmed {
+  background: var(--urgent-bg);
+  color: var(--urgent);
+}
+.clashBadgePossible {
+  background: var(--gold-bg);
+  color: var(--partial);
+}
+.clashPopover {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1.5px solid var(--sage);
+  border-radius: 8px;
+}
+.clashPopoverLine {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin: 0;
+  line-height: 1.5;
+}
+.clashPopoverLine + .clashPopoverLine {
+  margin-top: 4px;
 }
 
 /* ===== FORM ===== */

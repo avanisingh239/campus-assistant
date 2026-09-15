@@ -4,15 +4,14 @@
  * TEMPORARY dev harness for exercising the clash/free-slot engine
  * (lib/deterministic/) end to end against a real Supabase project. Not
  * part of the product UI — see app/(dev)/clash-test/actions.ts for why
- * this bypasses auth, and the same warning as app/(dev)/ingest-test/:
- * delete or gate this route before the app is reachable by anyone but
- * developers.
+ * this bypasses auth: delete or gate this route before the app is
+ * reachable by anyone but developers.
  *
  * Workflow: paste in a student's UUID (Supabase dashboard -> Authentication
  * -> Users -> copy the UUID), add one or more timetable entries for them,
- * mark some of the announcements already in the DB (from /ingest-test
- * testing) as Interested/Registered, then hit "Refresh" to see the
- * resulting clashes/free_slots rows.
+ * mark some of the announcements already in the DB (from /student/ingest
+ * or an admin form) as Interested/Registered, then hit "Refresh" to see
+ * the resulting clashes/free_slots rows.
  */
 
 import { useEffect, useState } from "react";
@@ -181,9 +180,9 @@ export default function ClashTestPage() {
         <h2 style={{ marginTop: 0 }}>Recent announcements</h2>
         <p className="muted">
           Set the pasted-in student&apos;s engagement status on any of these (from earlier{" "}
-          <code>/ingest-test</code> runs) to trigger class_vs_event / event_vs_event clash checks.
+          <code>/student/ingest</code> runs) to trigger class_vs_event / event_vs_event clash checks.
         </p>
-        {announcements.length === 0 && <p className="muted">None yet — run /ingest-test first.</p>}
+        {announcements.length === 0 && <p className="muted">None yet — run /student/ingest first.</p>}
         {announcements.map((a) => (
           <div key={a.id} style={{ borderTop: "1px solid var(--border)", paddingBlock: "0.75rem" }}>
             <strong>{a.title}</strong>{" "}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   addTimetableEntry,
   updateTimetableEntry,
@@ -8,16 +8,34 @@ import {
   type TimetableEntryInput,
 } from "@/lib/timetable/actions";
 import { buildWeeklyGrid } from "@/lib/timetable/weekly-grid";
+import { buildEntryStatusMap } from "@/lib/timetable/entry-status";
 import type { TimetableEntry } from "@/lib/timetable/types";
-import { WEEKDAYS, formatTimeRange } from "@/lib/dashboard/format";
+import { WEEKDAYS } from "@/lib/dashboard/format";
 import { CanvasBackground } from "@/components/canvas-background";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon } from "@/components/icons";
 import { AppHeader } from "../app-header";
 import { TabRow } from "../tab-row";
 import { TimetableForm } from "./timetable-form";
+import { EntryBlock } from "./entry-block";
 import shellStyles from "../shell.module.css";
 import styles from "./timetable.module.css";
+
+interface ClashRow {
+  timetable_entry_id: string | null;
+  announcement_id: string | null;
+  severity: "possible" | "confirmed";
+}
+
+interface FreeSlotRow {
+  timetable_entry_id: string;
+  matched_announcement_id: string | null;
+}
+
+interface AnnouncementTitleRow {
+  id: string;
+  title: string;
+}
 
 type Screen = "empty" | "list" | "form";
 
@@ -41,13 +59,41 @@ function screenForCount(count: number): "empty" | "list" {
  * there's nothing to optimistically fake before they return, so each
  * mutation just waits for the action, then updates local state from its
  * result.
+ *
+ * `clashes`/`freeSlots`/`announcementTitles` are point-in-time data from
+ * the initial page load, not re-fetched after a client-side add/edit/
+ * delete — the Server Actions already re-run `syncClashesForStudent` on
+ * every mutation, so the underlying `clashes` table is always correct,
+ * but this component doesn't round-trip back to the server to pick up
+ * the new result mid-session. A student will see the badges update after
+ * their next page load. Acceptable scope for "surface what's already
+ * being computed," not a live-sync requirement.
  */
-export function TimetableScreen({ initialEntries }: { initialEntries: TimetableEntry[] }) {
+export function TimetableScreen({
+  initialEntries,
+  clashes,
+  freeSlots,
+  announcementTitles,
+}: {
+  initialEntries: TimetableEntry[];
+  clashes: ClashRow[];
+  freeSlots: FreeSlotRow[];
+  announcementTitles: AnnouncementTitleRow[];
+}) {
   const [entries, setEntries] = useState(initialEntries);
   const [screen, setScreen] = useState<Screen>(screenForCount(initialEntries.length));
   const [editingEntry, setEditingEntry] = useState<TimetableEntry | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const announcementTitleById = useMemo(
+    () => new Map(announcementTitles.map((a) => [a.id, a.title])),
+    [announcementTitles],
+  );
+  const entryStatusById = useMemo(
+    () => buildEntryStatusMap(entries, clashes, freeSlots, announcementTitleById),
+    [entries, clashes, freeSlots, announcementTitleById],
+  );
 
   function openAddForm() {
     setEditingEntry(null);
@@ -182,16 +228,12 @@ export function TimetableScreen({ initialEntries }: { initialEntries: TimetableE
                     <p className={styles.dayEmpty}>No classes</p>
                   ) : (
                     column.entries.map((entry) => (
-                      <button key={entry.id} className={styles.entryBlock} onClick={() => openEditForm(entry)}>
-                        <p className={styles.entryCourse}>{entry.course_name}</p>
-                        <p className={styles.entryTime}>{formatTimeRange(entry.start_time, entry.end_time)}</p>
-                        {(entry.section || entry.teacher_name) && (
-                          <p className={styles.entryMeta}>
-                            {[entry.section, entry.teacher_name].filter(Boolean).join(" · ")}
-                            {entry.teacher_name && !entry.teacher_name_confirmed ? " (unconfirmed)" : ""}
-                          </p>
-                        )}
-                      </button>
+                      <EntryBlock
+                        key={entry.id}
+                        entry={entry}
+                        status={entryStatusById.get(entry.id)}
+                        onEdit={() => openEditForm(entry)}
+                      />
                     ))
                   )}
                 </div>

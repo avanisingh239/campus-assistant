@@ -154,6 +154,28 @@ export function LogoMark() {
   );
 }
 
+/** Upload-to-tray glyph for the WhatsApp .txt export tile on /student/ingest. */
+export function UploadIcon() {
+  return (
+    <svg {...strokeProps}>
+      <path d="M12 16V4M8 8l4-4 4 4" />
+      <path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3" />
+    </svg>
+  );
+}
+
+/** Share glyph for the disabled "Coming soon" Web Share Target tile on /student/ingest. */
+export function ShareIcon() {
+  return (
+    <svg {...strokeProps}>
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <path d="M8.6 10.5l6.8-4M8.6 13.5l6.8 4" />
+    </svg>
+  );
+}
+
 /** Filled graduation-cap glyph for the student role tile on /login. */
 export function GraduationCapIcon() {
   return (
