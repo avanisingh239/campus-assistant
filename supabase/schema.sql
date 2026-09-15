@@ -34,7 +34,14 @@ create type clash_severity as enum ('possible', 'confirmed');
 
 create type admin_scope_type as enum ('class', 'society');
 
-create type source_type as enum ('paste', 'whatsapp_export', 'admin_form');
+-- 'whatsapp_bot' added for app/api/whatsapp-webhook/route.ts (Meta Cloud API
+-- inbound webhook) — a live 1:1 WhatsApp forward, distinct from
+-- 'whatsapp_export' (a bulk .txt chat-history upload via /student/ingest).
+-- ⚠️ This value did not exist when this schema was first applied — running
+-- this file's `create type` again is a no-op against an existing type, so
+-- the live project needs the ALTER TYPE migration noted in CLAUDE.md's
+-- §WhatsApp webhook run against it directly.
+create type source_type as enum ('paste', 'whatsapp_export', 'admin_form', 'whatsapp_bot');
 
 
 -- ---------- PROFILES (extends auth.users) ----------
