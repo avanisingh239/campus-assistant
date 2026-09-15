@@ -125,7 +125,21 @@ create trigger on_auth_user_created
 create table messages (
   id uuid primary key default gen_random_uuid(),
   raw_text text not null,
-  source_group_name text,              -- e.g. "CSE-2028-A", "Photography Society"
+  source_group_name text,              -- free-text DISPLAY label only, e.g. "CSE 1A 🔥",
+                                        -- "Photography Society" — whatever the student typed;
+                                        -- never used for RLS matching (see submitted_by_class_name).
+  submitted_by_class_name text,        -- the RLS MATCHING key for class-scoped categories (see the
+                                        -- announcements policy below) — set server-side, automatically,
+                                        -- from profiles.class_name of whoever's `submitted_by` id is
+                                        -- below, at insert time (lib/ingestion/ingest.ts). Never typed
+                                        -- by a user and never accepted as client input, unlike
+                                        -- source_group_name above — a real class name ("CSE-2028-A")
+                                        -- is a different shape of data than a free-text group label
+                                        -- ("CSE 1A 🔥") and conflating the two broke class-scoping in
+                                        -- normal use (see the migration note near the bottom of this
+                                        -- file). Null for whatsapp_bot-sourced messages (no
+                                        -- authenticated student session to derive it from) and for any
+                                        -- message with no submitted_by at all.
   source_type source_type not null,
   submitted_by uuid references profiles(id), -- set for admin_form submissions (5.1)
   created_at timestamptz not null default now()
@@ -267,14 +281,30 @@ create policy "student manages own timetable" on timetable_entries
 --   - its category is inherently cross-class ('society_link', 'event',
 --     'opportunity', 'registered_update' — see below for why exactly
 --     these four, not just society_link); OR
---   - the message it was extracted from has a `source_group_name` that
---     matches the viewing student's own `profiles.class_name` (case/
---     whitespace-insensitive — two independently free-typed fields
---     matching by exact case would be a near-certain real-world footgun).
+--   - the message it was extracted from has a `submitted_by_class_name`
+--     that matches the viewing student's own `profiles.class_name` (case/
+--     whitespace-insensitive — two independently-set fields matching by
+--     exact case would be a near-certain real-world footgun).
 -- `deadline`/`cancellation` (the task's own explicit examples of what must
 -- NOT be shared) and the catch-all `fyi`/`duplicate`/`uncategorized` stay
 -- class-scoped by default — administrative/schedule data specific to one
 -- class, not campus-wide by nature.
+--
+-- Matches against `submitted_by_class_name`, NOT `source_group_name` — see
+-- messages' own column comment above and the "class-scoping / display-label
+-- split" migration note near the bottom of this file for why. In short:
+-- this policy used to match `source_group_name` (a free-text label a
+-- student types, e.g. a WhatsApp group's own display name like "CSE 1A 🔥")
+-- against `profiles.class_name` (an official class name like
+-- "CSE-2028-A") — two fields that were never the same shape of data, so a
+-- legitimate class's own messages routinely failed to match their own
+-- class and became silently invisible. `submitted_by_class_name` is a
+-- second, purpose-built column: the submitting student's real
+-- `profiles.class_name`, copied in server-side at insert time
+-- (lib/ingestion/ingest.ts) and never accepted as user input, so it's
+-- always in the same shape/format as the `profiles.class_name` it's
+-- compared against here. `source_group_name` keeps its original free-text
+-- display purpose (trace-to-source, the communities directory) untouched.
 --
 -- Why 'event'/'opportunity'/'registered_update' join 'society_link' as
 -- cross-class, beyond the task's one explicit example: they're exactly
@@ -309,9 +339,9 @@ create policy "announcements readable by own class or shared category" on announ
       join messages m on m.id = asrc.message_id
       join profiles p on p.id = auth.uid()
       where asrc.announcement_id = announcements.id
-        and m.source_group_name is not null
+        and m.submitted_by_class_name is not null
         and p.class_name is not null
-        and lower(trim(m.source_group_name)) = lower(trim(p.class_name))
+        and lower(trim(m.submitted_by_class_name)) = lower(trim(p.class_name))
     )
   );
 
@@ -404,6 +434,65 @@ create policy "contradictions readable by authenticated users" on contradictions
 
 create policy "admin reads own scope" on admin_scopes
   for select using (auth.uid() = profile_id);
+
+-- ============================================================
+-- ADDED — Class-scoping / display-label split (see CLAUDE.md's §Admin
+-- Dashboard section list — search for "submitted_by_class_name"). A real
+-- design flaw found in testing: the announcements policy above used to
+-- match `messages.source_group_name` (whatever free text a student typed
+-- for a WhatsApp group's display name, e.g. "CSE 1A 🔥") against the
+-- viewer's `profiles.class_name` (an official class name, e.g.
+-- "CSE-2028-A") — two fields that are never reliably the same shape of
+-- data in normal use, so a class's own legitimate messages routinely
+-- failed to match and silently became invisible to that very class.
+--
+-- The fix: `messages` gets a new column, `submitted_by_class_name`, that is
+-- NEVER user-typed — it's copied server-side from the submitting student's
+-- own `profiles.class_name` at insert time (lib/ingestion/ingest.ts, keyed
+-- off the already-trusted `submitted_by` id), so it's always in the same
+-- format as the `profiles.class_name` this policy compares it against.
+-- `source_group_name` is untouched and keeps its original free-text
+-- display/trace-to-source purpose — it was never wrong for THAT job, only
+-- overloaded into a second, incompatible one.
+--
+-- This is a NEW COLUMN plus a POLICY CHANGE. The `drop policy if exists`
+-- pair below is deliberately defensive about which of the two prior
+-- policies (the original global one, or the source_group_name-based
+-- class-scoped one from the Cross-student data isolation fix above) is
+-- still live on your project — at most one of the two exists at any time,
+-- and `if exists` makes this block safe to run regardless of which:
+--
+--   alter table messages add column submitted_by_class_name text;
+--
+--   drop policy if exists "announcements readable by authenticated users" on announcements;
+--   drop policy if exists "announcements readable by own class or shared category" on announcements;
+--
+--   create policy "announcements readable by own class or shared category" on announcements
+--     for select using (
+--       category in ('society_link', 'event', 'opportunity', 'registered_update')
+--       or exists (
+--         select 1
+--         from announcement_sources asrc
+--         join messages m on m.id = asrc.message_id
+--         join profiles p on p.id = auth.uid()
+--         where asrc.announcement_id = announcements.id
+--           and m.submitted_by_class_name is not null
+--           and p.class_name is not null
+--           and lower(trim(m.submitted_by_class_name)) = lower(trim(p.class_name))
+--       )
+--     );
+--
+-- Existing `messages` rows all get `submitted_by_class_name = null` after
+-- the `alter table` above (there's no way to backfill it retroactively —
+-- the original submitting student's class at submission time isn't
+-- recoverable from `source_group_name` alone, since that's exactly the
+-- mismatched field this migration exists to stop relying on). A null
+-- never matches any real class name, so old class-scoped test
+-- announcements become invisible to everyone rather than incorrectly
+-- visible to everyone — the safe direction to fail in. Old test data is
+-- effectively retired, not migrated; submit fresh data after this runs to
+-- test class-scoping again (see CLAUDE.md for the exact steps).
+-- ============================================================
 
 
 -- ============================================================

@@ -76,6 +76,15 @@ export async function submitClassUpdate(
       raw_text: draft.raw_text,
       source_type: "admin_form",
       source_group_name: scope.class_name,
+      // The announcements SELECT policy's class-match branch keys off this
+      // column, not source_group_name (see supabase/schema.sql's
+      // "class-scoping / display-label split" migration note) — a
+      // `cancellation` (this flow's category) is class-scoped, not one of
+      // the four cross-class categories, so without this a CR's own
+      // submission would silently become invisible to their own class,
+      // same failure mode the migration exists to fix. scope.class_name is
+      // already a verified admin_scopes lookup above, not client input.
+      submitted_by_class_name: scope.class_name,
       submitted_by: adminId,
     })
     .select("id")
