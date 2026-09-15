@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fieldErrorsFromZod, type FieldErrors } from "@/lib/validation";
 
 /**
  * Form validation for /login. Reuses zod (already a dependency for the AI
@@ -6,6 +7,8 @@ import { z } from "zod";
  * new form library — plain controlled inputs + these schemas is enough for
  * three small forms.
  */
+
+export { fieldErrorsFromZod, type FieldErrors };
 
 export const studentLoginSchema = z.object({
   email: z.string().min(1, "Email is required.").email("Enter a valid email address."),
@@ -24,19 +27,3 @@ export const adminLoginSchema = studentLoginSchema;
 export type StudentLoginInput = z.infer<typeof studentLoginSchema>;
 export type StudentSignupInput = z.infer<typeof studentSignupSchema>;
 export type AdminLoginInput = z.infer<typeof adminLoginSchema>;
-
-export type FieldErrors<T> = Partial<Record<keyof T, string>>;
-
-/** Flattens a ZodError into { field: firstMessage }, for rendering one inline error per field. */
-export function fieldErrorsFromZod<T extends Record<string, unknown>>(
-  error: z.ZodError<T>,
-): FieldErrors<T> {
-  const errors: FieldErrors<T> = {};
-  for (const issue of error.issues) {
-    const key = issue.path[0] as keyof T | undefined;
-    if (key !== undefined && !(key in errors)) {
-      errors[key] = issue.message;
-    }
-  }
-  return errors;
-}

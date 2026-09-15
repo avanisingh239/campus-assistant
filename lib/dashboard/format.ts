@@ -1,6 +1,7 @@
 import type { DashboardAnnouncement } from "./types";
 
-const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+/** 0=Sunday..6=Saturday — matches `Date.getUTCDay()` and `timetable_entries.day_of_week`'s convention (see lib/deterministic/overlap.ts's `dayOfWeekFromDate` doc comment). Exported so lib/timetable/* can reuse the same weekday names instead of a second copy. */
+export const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
