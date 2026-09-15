@@ -99,8 +99,8 @@ function sleep(ms: number): Promise<void> {
  * which the free tier also returns under load) gets up to MAX_ATTEMPTS-1
  * retries with exponential backoff before giving up with a RateLimitError
  * whose message is meant to be shown directly to the user (see
- * app/(dev)/ingest-test/page.tsx, which surfaces any thrown Error's
- * `.message`).
+ * app/student/ingest/result-panel.tsx, which surfaces any thrown Error's
+ * `.message` in the Failed result state).
  */
 export async function extractAnnouncements(
   rawText: string,

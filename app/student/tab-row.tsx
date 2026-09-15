@@ -1,15 +1,16 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ActionPlanIcon, StarIcon, TwoCirclesIcon, CalendarIcon } from "@/components/icons";
+import { ActionPlanIcon, StarIcon, TwoCirclesIcon, CalendarIcon, ChatBubbleIcon } from "@/components/icons";
 import styles from "./shell.module.css";
 
-export type StudentTab = "dashboard" | "discover" | "communities" | "timetable";
+export type StudentTab = "dashboard" | "discover" | "communities" | "timetable" | "ingest";
 
 const TABS: { tab: StudentTab; href: string; icon: ReactNode; label: string }[] = [
   { tab: "dashboard", href: "/student/dashboard", icon: <ActionPlanIcon />, label: "Action plan" },
   { tab: "discover", href: "/student/dont-miss-this", icon: <StarIcon />, label: "Don't miss this" },
   { tab: "communities", href: "/student/communities", icon: <TwoCirclesIcon />, label: "Communities" },
   { tab: "timetable", href: "/student/timetable", icon: <CalendarIcon />, label: "Timetable" },
+  { tab: "ingest", href: "/student/ingest", icon: <ChatBubbleIcon />, label: "Add messages" },
 ];
 
 /**

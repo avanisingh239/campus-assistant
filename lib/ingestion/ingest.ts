@@ -7,7 +7,7 @@ import {
   matchAnnouncementToOpenFreeSlots,
 } from "@/lib/deterministic/sync";
 import { toAnnouncementRow } from "./map-to-announcement";
-import type { IngestOptions, IngestResult } from "./types";
+import type { IngestOptions, IngestResult, IngestedAnnouncementSummary } from "./types";
 
 /**
  * End-to-end ingestion pipeline: raw pasted text -> Claude extraction ->
@@ -70,6 +70,7 @@ export async function ingestRawText(
 
   // 3. One announcement + one announcement_sources link per extracted item.
   const announcementIds: string[] = [];
+  const announcements: IngestedAnnouncementSummary[] = [];
   for (const item of extracted) {
     const row = toAnnouncementRow(item);
 
@@ -100,6 +101,12 @@ export async function ingestRawText(
     }
 
     announcementIds.push(announcement.id as string);
+    announcements.push({
+      id: announcement.id as string,
+      category: row.category,
+      title: row.title,
+      confidence: row.confidence,
+    });
 
     // Rule 5 (docs/data-model.md §5): free-slot matching runs at creation
     // time in both directions - a cancellation opens slots across every
@@ -116,5 +123,6 @@ export async function ingestRawText(
     messageId: message.id as string,
     announcementIds,
     extractedCount: extracted.length,
+    announcements,
   };
 }

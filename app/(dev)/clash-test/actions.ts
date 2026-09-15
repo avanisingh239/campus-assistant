@@ -6,15 +6,14 @@ import type { EngagementStatus } from "@/lib/deterministic/types";
 
 /**
  * TEMPORARY dev-only actions for exercising the clash/free-slot engine
- * against a real Supabase project without a real signed-in student session
- * — there's no timetable/engagement UI yet (lib/timetable/actions.ts and
- * lib/engagement/actions.ts both require `auth.getUser()`), so this page
- * bypasses that via the service-role client and an arbitrary pasted-in
- * `studentId`, the same way app/(dev)/ingest-test bypasses auth for its
- * own testing. Same warning applies: delete or gate this route before the
- * app is reachable by anyone but developers — it writes to real
- * `timetable_entries`/`student_announcement_status` rows for whatever
- * student ID it's given, no ownership check at all.
+ * against a real Supabase project by pasting in an arbitrary student UUID
+ * rather than using a real signed-in session — useful for testing a
+ * student who doesn't want to go through actual signup/login, e.g. to
+ * check clashes against announcements seeded by some other means. Same
+ * warning as the (now-deleted) app/(dev)/ingest-test applied: delete or
+ * gate this route before the app is reachable by anyone but developers —
+ * it writes to real `timetable_entries`/`student_announcement_status` rows
+ * for whatever student ID it's given, no ownership check at all.
  *
  * Deliberately NOT reusing lib/timetable/actions.ts or
  * lib/engagement/actions.ts — those are the real, RLS-respecting,

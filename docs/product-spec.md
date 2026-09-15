@@ -100,6 +100,8 @@ The reference directory for campus organizations:
   * **Bulk Paste Box [Source 1.2 - MVP]:** Primary demo flow for pasting 50+ messy chat messages.
   * **WhatsApp Chat Export Upload [Source 1.3 - MVP]:** File uploader for official `.txt` exports, stripping system notices.
   * **Web Share Target [Source 1.1 - Phase 2 — Deferred but Committed]:** OS-level share receiver; deferred to Phase 2 due to mobile browser OS variations (specifically iOS Safari limitations) while Bulk Paste provides universal MVP coverage.
+
+  > **As built:** implemented as its own tab/route, `/student/ingest`, not a dashboard slide-over — same supersession as the "Don't Miss This" lane below. Bulk Paste and WhatsApp `.txt` Upload are both real; Web Share Target is a visibly disabled "Coming soon" tile, matching this doc's own Phase-2 tag for it. See CLAUDE.md's §Ingestion page.
 * **Trace-to-Source Drawer (`TraceToSourceDrawer`) [Source 3.3]:** Slide-over triggered by tapping any announcement card, displaying verbatim raw text, sender, timestamp, and batch ID.
 * **Contradiction Callout (`ContradictionBanner`) [Source 3.2]:** In-card warning banner displaying conflicting details across merged sources (e.g., *"Source A says Room 201; Source B says Room 304"*).
 * **Confidence Explainer (`ConfidenceBadge`) [Source 2.7]:** In-card badge (`✅ Clear`, `⚠️ Partially clear`, `❓ Unclear`) with an interactive popover explaining what information is missing.

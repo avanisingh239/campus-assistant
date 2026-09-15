@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { DashboardAnnouncement } from "@/lib/dashboard/types";
 import type { EngagementStatus } from "@/lib/deterministic/types";
-import { CATEGORY_LABELS, supportsEngagementToggle } from "@/lib/dashboard/category-meta";
+import { CATEGORY_LABELS, CONFIDENCE_LABELS, supportsEngagementToggle } from "@/lib/dashboard/category-meta";
 import { formatCapMeta, splitVerb, formatRelativeTimeCaps } from "@/lib/dashboard/format";
 import { WarningCircleIcon, ArrowMergeIcon, ChainLinkIcon } from "@/components/icons";
 import { CategoryIcon } from "./icons";
@@ -16,13 +16,10 @@ const ENGAGEMENT_OPTIONS: { status: EngagementStatus; label: string }[] = [
   { status: "not_interested", label: "Not interested" },
 ];
 
-const CONFIDENCE_META: Record<
-  DashboardAnnouncement["confidence"],
-  { label: string; className: string }
-> = {
-  clear: { label: "✅ Clear", className: styles.confidenceClear },
-  partial: { label: "⚠️ Partially clear", className: styles.confidencePartial },
-  unclear: { label: "❓ Unclear", className: styles.confidenceUnclear },
+const CONFIDENCE_CLASS: Record<DashboardAnnouncement["confidence"], string> = {
+  clear: styles.confidenceClear,
+  partial: styles.confidencePartial,
+  unclear: styles.confidenceUnclear,
 };
 
 export function Card({
@@ -43,7 +40,10 @@ export function Card({
   const { verb, rest } = announcement.what_to_do_next
     ? splitVerb(announcement.what_to_do_next)
     : { verb: "", rest: "" };
-  const confidence = CONFIDENCE_META[announcement.confidence];
+  const confidence = {
+    label: CONFIDENCE_LABELS[announcement.confidence],
+    className: CONFIDENCE_CLASS[announcement.confidence],
+  };
   const tagLabel = announcement.contradiction
     ? `Merged · ${announcement.sourceCount} sources`
     : CATEGORY_LABELS[announcement.category];

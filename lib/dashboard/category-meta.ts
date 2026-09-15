@@ -1,4 +1,4 @@
-import type { AnnouncementCategory } from "./types";
+import type { AnnouncementCategory, ConfidenceLevel } from "./types";
 
 /**
  * Human-readable tag label per category — matches announcement_category in
@@ -56,3 +56,18 @@ export const CATEGORY_ICON: Record<AnnouncementCategory, string> = {
 export function supportsEngagementToggle(category: AnnouncementCategory): boolean {
   return category !== "society_link";
 }
+
+/**
+ * The confidence badge text (docs/product-spec.md Area C.4's
+ * `confidence_badge`: `✅ Clear` / `⚠️ Partially clear` / `❓ Unclear`).
+ * Pulled out of card.tsx once app/student/ingest's result panel needed the
+ * exact same three labels — the CSS class per level stays local to each
+ * consumer (card.tsx / result-panel.tsx), since which stylesheet's
+ * `.confidenceClear` etc. applies depends on which CSS Module the caller
+ * already imports, not on this shared text.
+ */
+export const CONFIDENCE_LABELS: Record<ConfidenceLevel, string> = {
+  clear: "✅ Clear",
+  partial: "⚠️ Partially clear",
+  unclear: "❓ Unclear",
+};
