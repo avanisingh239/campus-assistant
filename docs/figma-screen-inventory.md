@@ -98,6 +98,7 @@ Every element in this inventory is categorized into one of five statuses:
 ---
 
 ### 1.4 Communities
+* **As built (this MVP pass):** society/group name, description, link chip (not clickable — text display, matching the dashboard card's existing link-chip treatment), unverified-link warning, trace-to-source, and de-dupe by exact `link_url`. Search, category filter pills, a group-count badge, and a "Join Community" button are not built yet — see CLAUDE.md's §Communities directory for the exact scope this pass covered.
 * **Purpose:** Searchable reference directory of campus societies, clubs, and group join links without scrollback noise.
 * **User Role:** Student
 * **Entry Point:** `/student/communities`
