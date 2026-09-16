@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { shapeAnnouncements } from "@/lib/dashboard/shape-announcements";
 import { buildDiffSummary } from "@/lib/dashboard/diff-summary";
-import { pickUrgentAnnouncementId } from "@/lib/dashboard/priority";
+import { pickUrgentAnnouncementId, sortByPriorityScore } from "@/lib/dashboard/priority";
 import { DashboardClient } from "./dashboard-client";
 
 // Never statically prerendered — it's a per-student, RLS-scoped fetch.
@@ -40,7 +40,12 @@ export default async function StudentDashboardPage() {
     .select(
       "id, category, title, why_it_matters, what_to_do_next, confidence, confidence_note, event_date, start_time, end_time, deadline_at, link_url, link_verified, seat_count, seats_unclear, priority_score, created_at, updated_at",
     )
-    .order("priority_score", { ascending: false })
+    // The real sort now happens in JS, in sortByPriorityScore below, using
+    // a live-computed score — this base order (used as a stable tie-break
+    // by that sort, and as the order before that resort even runs) no
+    // longer needs `priority_score`: every row's stored value has been 0
+    // since the schema was first applied (see lib/dashboard/priority.ts's
+    // own doc comment), so ordering by it was never meaningful.
     .order("created_at", { ascending: false });
 
   if (announcementsError) {
@@ -86,7 +91,7 @@ export default async function StudentDashboardPage() {
     throw new Error(`Failed to load source messages: ${messagesError.message}`);
   }
 
-  const announcements = shapeAnnouncements(
+  const shapedAnnouncements = shapeAnnouncements(
     announcementRows ?? [],
     engagementResult.data ?? [],
     contradictionResult.data ?? [],
@@ -116,6 +121,10 @@ export default async function StudentDashboardPage() {
   }
 
   const now = new Date();
+  // Real, live-computed priority order (lib/dashboard/priority.ts) — this
+  // is the card feed's actual sort now, not the DB query's now-dropped
+  // (always-0) priority_score order above.
+  const announcements = sortByPriorityScore(shapedAnnouncements, now);
   const urgentId = pickUrgentAnnouncementId(announcements, now);
   const diffSummary = buildDiffSummary(announcements, lastSeenResult.data?.last_seen_at ?? null);
 

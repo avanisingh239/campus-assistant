@@ -214,4 +214,43 @@ describe("announcementFitsInFreedSlot / findMatchingOpportunityAnnouncement (rul
   it("returns null when nothing fits", () => {
     expect(findMatchingOpportunityAnnouncement(c, freedWindow, [])).toBeNull();
   });
+
+  it("matches an opportunity that already existed before the free slot was created, not just one ingested afterward", () => {
+    // Real scenario the "match newly-created free slots against
+    // already-existing opportunities" fix addresses: a Robotics Club
+    // workshop was ingested last week; today a class gets cancelled,
+    // freeing a matching slot. lib/deterministic/sync.ts's
+    // linkNewFreeSlotsToExistingAnnouncements calls
+    // findMatchingOpportunityAnnouncement immediately after a new
+    // free_slots row is inserted (from *either* trigger direction), against
+    // *all* existing event/opportunity announcements — not only ones
+    // ingested after the slot already existed (that forward-only direction,
+    // "a new opportunity checked against already-open slots," is
+    // matchAnnouncementToOpenFreeSlots's job, exercised by the
+    // "findMatchingOpportunityAnnouncement returns the first fitting
+    // candidate's id" test above). This test proves the exact combination
+    // the fix relies on — findFreeSlotCandidate immediately followed by
+    // findMatchingOpportunityAnnouncement against pre-existing data —
+    // produces a match, without needing a live Supabase project to prove it
+    // (this codebase's established convention: test the pure logic these
+    // sync.ts wrappers call, not the wrappers themselves — see CLAUDE.md).
+    const preExistingWorkshop: AnnouncementForDeterministicEngine = {
+      id: "robotics-workshop",
+      category: "opportunity",
+      event_date: "2026-09-14",
+      start_time: "09:15",
+      end_time: "09:45",
+    };
+    const entry = timetableEntry();
+
+    // The slot itself is only created now ...
+    const candidates = findFreeSlotCandidate(c, [entry]);
+    expect(candidates).toHaveLength(1);
+
+    // ... but is immediately checked against the workshop that was already
+    // sitting in the data beforehand.
+    expect(findMatchingOpportunityAnnouncement(c, freedWindow, [preExistingWorkshop])).toBe(
+      "robotics-workshop",
+    );
+  });
 });

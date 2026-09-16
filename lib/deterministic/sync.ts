@@ -15,6 +15,50 @@ import type {
 const FREE_SLOT_FILLER_CATEGORIES = ["event", "opportunity"] as const;
 
 /**
+ * Shared by both `syncFreeSlotsForCancellation` and
+ * `matchTimetableEntryToExistingCancellations`: given `free_slots` rows that
+ * were *just* inserted, check each one against every already-existing
+ * `event`/`opportunity` announcement (not just ones ingested afterward —
+ * that forward-only direction is `matchAnnouncementToOpenFreeSlots`'s job)
+ * and link the first fit. Not a new matching implementation — this is only
+ * the DB-fetching/looping wrapper around `findMatchingOpportunityAnnouncement`
+ * (lib/deterministic/free-slots.ts), reused as-is.
+ */
+async function linkNewFreeSlotsToExistingAnnouncements(
+  supabase: SupabaseClient,
+  insertedSlots: { id: string; timetable_entry_id: string; cancellation_announcement_id: string }[],
+  cancellationById: Map<string, AnnouncementForDeterministicEngine>,
+  entryById: Map<string, Pick<TimetableEntryRow, "start_time" | "end_time">>,
+): Promise<void> {
+  if (insertedSlots.length === 0) return;
+
+  const { data: openCategoryAnnouncements, error: annError } = await supabase
+    .from("announcements")
+    .select("id, category, event_date, start_time, end_time")
+    .in("category", FREE_SLOT_FILLER_CATEGORIES);
+  if (annError) throw new Error(`Failed to load candidate announcements: ${annError.message}`);
+
+  for (const slot of insertedSlots) {
+    const entry = entryById.get(slot.timetable_entry_id);
+    const cancellation = cancellationById.get(slot.cancellation_announcement_id);
+    if (!entry || !cancellation) continue;
+
+    const matchId = findMatchingOpportunityAnnouncement(
+      cancellation,
+      entry,
+      (openCategoryAnnouncements ?? []) as AnnouncementForDeterministicEngine[],
+    );
+    if (!matchId) continue;
+
+    const { error: updateError } = await supabase
+      .from("free_slots")
+      .update({ matched_announcement_id: matchId })
+      .eq("id", slot.id);
+    if (updateError) throw new Error(`Failed to link matched announcement: ${updateError.message}`);
+  }
+}
+
+/**
  * DB-fetching/writing wrappers around the pure functions in clashes.ts and
  * free-slots.ts. Everything here takes a Supabase client rather than
  * constructing its own — every call site in this codebase passes
@@ -150,36 +194,22 @@ export async function syncFreeSlotsForCancellation(
   const { data: inserted, error: insertError } = await supabase
     .from("free_slots")
     .insert(candidates)
-    .select("id, timetable_entry_id");
+    .select("id, timetable_entry_id, cancellation_announcement_id");
   if (insertError) throw new Error(`Failed to insert free_slots: ${insertError.message}`);
 
   // Second half of rule 5: check existing event/opportunity announcements
   // against each newly-opened slot.
-  const { data: openCategoryAnnouncements, error: annError } = await supabase
-    .from("announcements")
-    .select("id, category, event_date, start_time, end_time")
-    .in("category", FREE_SLOT_FILLER_CATEGORIES);
-  if (annError) throw new Error(`Failed to load candidate announcements: ${annError.message}`);
-
   const entryById = new Map(entries.map((e) => [e.id, e]));
+  const cancellationById = new Map([
+    [cancellation.id as string, cancellation as AnnouncementForDeterministicEngine],
+  ]);
 
-  for (const slot of inserted ?? []) {
-    const entry = entryById.get(slot.timetable_entry_id as string);
-    if (!entry) continue;
-
-    const matchId = findMatchingOpportunityAnnouncement(
-      cancellation as AnnouncementForDeterministicEngine,
-      entry,
-      (openCategoryAnnouncements ?? []) as AnnouncementForDeterministicEngine[],
-    );
-    if (!matchId) continue;
-
-    const { error: updateError } = await supabase
-      .from("free_slots")
-      .update({ matched_announcement_id: matchId })
-      .eq("id", slot.id);
-    if (updateError) throw new Error(`Failed to link matched announcement: ${updateError.message}`);
-  }
+  await linkNewFreeSlotsToExistingAnnouncements(
+    supabase,
+    (inserted ?? []) as { id: string; timetable_entry_id: string; cancellation_announcement_id: string }[],
+    cancellationById,
+    entryById,
+  );
 
   return { freeSlotCount: candidates.length };
 }
@@ -213,15 +243,18 @@ export async function syncFreeSlotsForCancellation(
  * constraint of its own, so a repeatedly-edited entry that keeps matching
  * the same cancellation would otherwise pile up duplicate rows.
  *
- * Deliberately does NOT also run the "check existing event/opportunity
- * announcements against the newly freed slot" second half
- * `syncFreeSlotsForCancellation` does — a free slot created here still
- * gets picked up by `matchAnnouncementToOpenFreeSlots` the moment any
- * *future* event/opportunity is created (that function scans every open
- * slot table-wide, not just freshly created ones), so the only edge this
- * leaves is an opportunity that already existed before this specific slot
- * was created; narrower in scope than what the task asked for, and not
- * the bug that was reported.
+ * **Now also runs the "check existing event/opportunity announcements
+ * against the newly freed slot" second half** `syncFreeSlotsForCancellation`
+ * already ran for the forward direction (fixed in a later pass — see
+ * CLAUDE.md's "Match newly-created free slots against already-existing
+ * opportunities" note). Before that fix, a free slot created here only got
+ * matched once some *future* event/opportunity happened to be created
+ * afterward (`matchAnnouncementToOpenFreeSlots` scans every open slot
+ * table-wide, but only runs when a *new* filler announcement arrives) — an
+ * opportunity that already existed before this specific slot was created
+ * would sit unmatched indefinitely unless something else re-triggered the
+ * check. Reuses the same `linkNewFreeSlotsToExistingAnnouncements` helper
+ * `syncFreeSlotsForCancellation` uses, not a second implementation.
  */
 export async function matchTimetableEntryToExistingCancellations(
   supabase: SupabaseClient,
@@ -249,8 +282,23 @@ export async function matchTimetableEntryToExistingCancellations(
 
   if (newCandidates.length === 0) return { freeSlotCount: 0 };
 
-  const { error: insertError } = await supabase.from("free_slots").insert(newCandidates);
+  const { data: inserted, error: insertError } = await supabase
+    .from("free_slots")
+    .insert(newCandidates)
+    .select("id, timetable_entry_id, cancellation_announcement_id");
   if (insertError) throw new Error(`Failed to insert free_slots: ${insertError.message}`);
+
+  const cancellationById = new Map(
+    (cancellations as AnnouncementForDeterministicEngine[]).map((c) => [c.id, c]),
+  );
+  const entryById = new Map([[entry.id, entry]]);
+
+  await linkNewFreeSlotsToExistingAnnouncements(
+    supabase,
+    (inserted ?? []) as { id: string; timetable_entry_id: string; cancellation_announcement_id: string }[],
+    cancellationById,
+    entryById,
+  );
 
   return { freeSlotCount: newCandidates.length };
 }

@@ -73,6 +73,21 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Real bug found in testing on a real Android phone, not reproducible by
+     resizing a desktop browser: Chrome for Android auto-boosts font-size
+     in narrow text blocks ("text autosizing"/"font boosting") — a
+     mobile-only heuristic with no desktop-Chrome equivalent, which is
+     exactly why desktop window-resizing never caught this. It silently
+     renders text larger than its CSS font-size wherever a block is judged
+     "narrow," breaking layout math (like flex-shrink:0 sizing) that was
+     correct for the specified font-size. This disables the heuristic
+     outright, standard practice for exactly this failure mode — see
+     CLAUDE.md's mobile-overflow note for how this was confirmed. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 html,
 body {
   padding: 0;
@@ -80,6 +95,14 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-inter), -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Site-wide safety net: every real screen already gets this from
+     components/ui.module.css's `.site` (via CanvasBackground), but that
+     only covers routes that render it — this guards any other/placeholder
+     page too, so a layout bug clips instead of creating whole-page
+     horizontal scroll. Should never actually engage on a real screen;
+     the fix belongs in the offending element (min-width: 0, flex-wrap),
+     not here — see CLAUDE.md's mobile-overflow note. */
+  overflow-x: hidden;
 }
 
 h1,

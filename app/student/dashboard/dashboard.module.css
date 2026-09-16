@@ -73,6 +73,9 @@
   padding: 14px 10px;
   text-align: center;
   box-shadow: 4px 4px 0 var(--sage);
+  /* Same grid-blowout guard as .card below — a grid item's automatic
+     minimum size is otherwise content-based, not track-based. */
+  min-width: 0;
 }
 .statIcon {
   width: 26px;
@@ -261,6 +264,7 @@
   color: var(--forest-deep);
   font-weight: 500;
   flex: 1;
+  min-width: 0;
 }
 .diffbarText strong {
   font-weight: 700;
@@ -296,6 +300,11 @@
   border: 3px solid var(--forest-deep);
   border-radius: 18px;
   overflow: visible;
+  /* Grid items default to a content-based automatic minimum width unless
+     overridden — without this, .cardCap's contents (see below) could still
+     force this card wider than its grid track (shell.module.css's .cards)
+     at narrow viewport widths, even once .cardCap itself wraps correctly. */
+  min-width: 0;
   animation: springIn 0.55s var(--bounce) both;
   transition:
     transform 0.2s var(--bounce),
@@ -402,6 +411,14 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  /* At narrow widths, .capMeta (min-width: 0, below) can only shrink so
+     far before .tag would otherwise force this row — and the .card grid
+     item hosting it — wider than the viewport. Letting the tag wrap onto
+     its own line instead keeps everything inside the card, matching every
+     other contained-wrap area in this codebase (.filterRow, .cardActions,
+     .linkChip) rather than clipping or squeezing tag text illegibly. */
+  flex-wrap: wrap;
+  row-gap: 6px;
   border-radius: 15px 15px 0 0;
 }
 .iconChip {
