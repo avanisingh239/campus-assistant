@@ -1,0 +1,75 @@
+/*
+ * The public landing page (/) — the "front door" version of the same
+ * brand identity already established for /login (app/(auth)/login/
+ * login.module.css's `.brand` block) and the student shell
+ * (app/student/shell.module.css's `.topbar`). A third copy of that same
+ * brand-block shape, not a shared extraction — matches this codebase's
+ * existing convention of each screen owning its own near-identical
+ * brand-block CSS (those two files already duplicate it independently)
+ * rather than forcing a shared component across three different layouts.
+ * Every color/font value here is copied from one of those two files, not
+ * invented for this page.
+ */
+
+.wrap {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 60px 24px;
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.logoMark {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 10px;
+}
+
+.appName {
+  font-family: var(--font-baloo), sans-serif;
+  font-size: 40px;
+  font-weight: 800;
+  margin: 0;
+  color: #ffffff;
+}
+
+/* Same value as login.module.css's/shell.module.css's own `.tagline`. */
+.tagline {
+  font-size: 16px;
+  color: #bfe0c4;
+  font-weight: 500;
+  margin: 6px 0 22px;
+}
+
+/* Same secondary-text-on-dark-canvas value as shell.module.css's
+   `.heroLabel`/`.emptyState`. */
+.description {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #ddf0df;
+  max-width: 380px;
+  margin: 0 0 32px;
+}
+
+.cta {
+  display: inline-block;
+  width: 100%;
+  max-width: 260px;
+  text-align: center;
+  text-decoration: none;
+}
+
+@media (max-width: 480px) {
+  .wrap {
+    padding: 40px 20px;
+  }
+  .appName {
+    font-size: 34px;
+  }
+}
