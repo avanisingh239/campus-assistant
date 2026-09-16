@@ -6,6 +6,16 @@
  * not `components/ui/pin-card.tsx`'s `PinCard`.
  */
 
+/* Same "#ddf0df secondary text on dark canvas" convention as
+   ../communities/communities.module.css's own .pageNote — not a new color. */
+.pageNote {
+  font-size: 13px;
+  color: #ddf0df;
+  line-height: 1.5;
+  margin: -8px 0 20px;
+  max-width: 560px;
+}
+
 .toolbar {
   display: flex;
   gap: 12px;

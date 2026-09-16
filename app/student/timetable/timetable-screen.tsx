@@ -183,6 +183,14 @@ export function TimetableScreen({
           Timetable
         </p>
 
+        {screen !== "form" && (
+          <p className={styles.pageNote}>
+            Free-slot recommendations only work for classes you&apos;ve added here. If a class gets
+            cancelled but isn&apos;t on your timetable, we won&apos;t be able to suggest something to
+            fill that time.
+          </p>
+        )}
+
         {screen === "empty" && (
           <div className={shellStyles.emptyState}>
             <h2>Add your first class</h2>
