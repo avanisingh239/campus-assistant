@@ -111,6 +111,38 @@ describe("findFreeSlotCandidate (rule 5, first half)", () => {
     const candidates = findFreeSlotCandidate(c, [entryA, entryB]);
     expect(candidates.map((cand) => cand.student_id).sort()).toEqual(["student-a", "student-b"]);
   });
+
+  it("still matches when called in the reverse-trigger shape — a single new/edited timetable entry checked against an already-existing cancellation, not a new cancellation checked against existing entries", () => {
+    // Real reported bug: a cancellation for "BEE, Monday 2-3pm" was
+    // ingested before the student had "BEE" on their timetable at all.
+    // lib/deterministic/sync.ts's matchTimetableEntryToExistingCancellations
+    // fixes this by calling this exact function with a one-entry list —
+    // this test locks in that this function's own matching rule doesn't
+    // care which side triggered the check, only that day/course/confidence
+    // line up, so reusing it from the other direction is safe.
+    const beeCancelledMonday = cancellation({
+      id: "cancel-bee",
+      linked_class_name: "BEE",
+      event_date: "2026-09-14", // Monday
+      match_confidence: 0.9,
+    });
+    const newlyAddedEntry = timetableEntry({
+      id: "new-entry",
+      student_id: "student-late-adder",
+      day_of_week: 1, // Monday
+      course_name: "BEE",
+    });
+
+    const candidates = findFreeSlotCandidate(beeCancelledMonday, [newlyAddedEntry]);
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({
+      student_id: "student-late-adder",
+      timetable_entry_id: "new-entry",
+      cancellation_announcement_id: "cancel-bee",
+      status: "confirmed",
+    });
+  });
 });
 
 describe("announcementFitsInFreedSlot / findMatchingOpportunityAnnouncement (rule 5, second half)", () => {
