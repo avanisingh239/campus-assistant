@@ -31,6 +31,11 @@ export function HowThisWorks() {
             Rescript never invents dates, rooms, deadlines, seat counts, or class matches. If the source text
             doesn&apos;t say it, the card says so instead of filling in something that sounds plausible.
           </p>
+          <p>
+            Marking <strong>Interested</strong> or <strong>Registered</strong> isn&apos;t just personal
+            tracking — it&apos;s what powers scheduling-clash detection and prioritization. Items you
+            haven&apos;t responded to won&apos;t be checked for conflicts.
+          </p>
         </div>
       )}
     </div>

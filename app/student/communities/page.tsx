@@ -8,6 +8,7 @@ import { TabRow } from "../tab-row";
 import { TwoCirclesIcon } from "@/components/icons";
 import { CommunityCard } from "./community-card";
 import shellStyles from "../shell.module.css";
+import styles from "./communities.module.css";
 
 // Same reasoning as the other real student screens: per-student, RLS-scoped
 // fetch, never statically cached.
@@ -92,6 +93,11 @@ export default async function StudentCommunitiesPage() {
         <p className={shellStyles.sectionLabel}>
           <TwoCirclesIcon />
           Communities
+        </p>
+
+        <p className={styles.pageNote}>
+          This directory updates live from messages shared by students across the platform — not just
+          your class — so you&apos;ll see society and event links as they&apos;re announced anywhere.
         </p>
 
         {links.length === 0 ? (

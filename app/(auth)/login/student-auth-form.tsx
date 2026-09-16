@@ -184,6 +184,11 @@ export function StudentAuthForm({ onBack }: { onBack: () => void }) {
                 onChange={(e) => setClassName(e.target.value)}
                 error={fieldErrors.class_name}
               />
+              <p className={styles.fieldHint}>
+                Enter your class exactly as your classmates would (e.g. CSE-2028-A) — this determines
+                which announcements you share with them. Use the same format your class officially
+                goes by.
+              </p>
               <TextField
                 id="student-signup-email"
                 label="Email"
