@@ -81,8 +81,7 @@ export class ExtractionError extends Error {}
 export class RateLimitError extends ExtractionError {}
 
 const MAX_ATTEMPTS = 3;
-const BASE_DELAY_MS = 1000;
-
+const BASE_DELAY_MS = 3000;
 function isRetryableStatus(status: number): boolean {
   return status === 429 || status === 503;
 }
@@ -105,14 +104,16 @@ function sleep(ms: number): Promise<void> {
 export async function extractAnnouncements(
   rawText: string,
 ): Promise<ExtractedAnnouncement[]> {
+  const MAX_CHARS = 12000;
+  const truncated = rawText.length > MAX_CHARS ? rawText.slice(0, MAX_CHARS) : rawText;
+
   const client = getGeminiClient();
   const systemInstruction = buildSystemPrompt(new Date());
-
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       const response = await client.models.generateContent({
         model: GEMINI_MODEL,
-        contents: rawText,
+                contents: truncated,
         config: {
           systemInstruction,
           responseMimeType: "application/json",
@@ -145,8 +146,10 @@ export async function extractAnnouncements(
 
       return result.data.announcements;
     } catch (err) {
+      if (err instanceof ApiError) {
+        console.error("GEMINI_API_ERROR", err.status, JSON.stringify(err, null, 2));
+      }
       const retryable = err instanceof ApiError && isRetryableStatus(err.status);
-
       if (retryable && attempt < MAX_ATTEMPTS) {
         await sleep(BASE_DELAY_MS * 2 ** (attempt - 1));
         continue;
