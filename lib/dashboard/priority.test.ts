@@ -142,6 +142,42 @@ describe("computePriorityScore", () => {
     );
     expect(noDate).toBeLessThan(nearFyi);
   });
+
+  it("real bug: an opportunity closing today beats a registered_update happening in several days, despite its lower category weight", () => {
+    // Exact reported scenario. Before the near-term floor, this failed:
+    // urgency(6h out)=98.2 * opportunity's 0.6 weight = 58.9, vs.
+    // urgency(4 days out)=71.4 * registered_update's 1.0 weight = 71.4 —
+    // the schedule-change update won despite being far less time-sensitive
+    // than the same-day opportunity. The floor fixes it by scoring the
+    // near-term item on raw urgency alone (98.2), bypassing the weight
+    // multiplier entirely, so it can never lose to a lower-urgency item
+    // just because that item's category happens to be weighted higher.
+    const opportunityClosingToday = computePriorityScore(
+      announcement({ category: "opportunity", event_date: "2026-09-14", start_time: "18:00" }), // 6h out
+      NOW,
+    );
+    const registeredUpdateInDays = computePriorityScore(
+      announcement({ category: "registered_update", deadline_at: "2026-09-18T12:00:00Z" }), // 4 days out
+      NOW,
+    );
+    expect(opportunityClosingToday).toBeGreaterThan(registeredUpdateInDays);
+  });
+
+  it("the near-term floor only applies inside the threshold — beyond it, the ordinary weighted formula still governs", () => {
+    // Same category pairing and similar-ish distance, but both now outside
+    // the 24h near-term window (2 days / 4 days out) — the higher-weight
+    // registered_update should win here, same as before this fix, proving
+    // the floor is a genuine bounded branch, not a blanket override.
+    const opportunityIn2Days = computePriorityScore(
+      announcement({ category: "opportunity", event_date: "2026-09-16", start_time: "12:00" }),
+      NOW,
+    );
+    const registeredUpdateIn4Days = computePriorityScore(
+      announcement({ category: "registered_update", deadline_at: "2026-09-18T12:00:00Z" }),
+      NOW,
+    );
+    expect(registeredUpdateIn4Days).toBeGreaterThan(opportunityIn2Days);
+  });
 });
 
 describe("sortByPriorityScore", () => {
@@ -206,5 +242,22 @@ describe("pickUrgentAnnouncementId", () => {
       deadline_at: "2026-10-20T00:00:00Z",
     });
     expect(pickUrgentAnnouncementId([nearEvent, farDeadline], NOW)).toBe("near-event");
+  });
+
+  it("real bug: an opportunity closing today wins the ribbon over a registered_update happening in several days", () => {
+    const opportunityClosingToday = announcement({
+      id: "opportunity-today",
+      category: "opportunity",
+      event_date: "2026-09-14",
+      start_time: "18:00", // 6h out
+    });
+    const registeredUpdateInDays = announcement({
+      id: "registered-update-later",
+      category: "registered_update",
+      deadline_at: "2026-09-18T12:00:00Z", // 4 days out
+    });
+    expect(pickUrgentAnnouncementId([opportunityClosingToday, registeredUpdateInDays], NOW)).toBe(
+      "opportunity-today",
+    );
   });
 });

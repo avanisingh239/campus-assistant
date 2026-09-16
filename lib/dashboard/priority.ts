@@ -104,6 +104,13 @@ function relevantInstant(announcement: PriorityScoreInput): Date | null {
   return null;
 }
 
+/** Hours until `relevantInstant`, or `null` when there's no date at all — shared by computeUrgencyScore and the near-term floor below, so both agree on exactly what "how soon" means. */
+function hoursUntilRelevantInstant(announcement: PriorityScoreInput, now: Date): number | null {
+  const instant = relevantInstant(announcement);
+  if (!instant) return null;
+  return (instant.getTime() - now.getTime()) / (1000 * 60 * 60);
+}
+
 /**
  * How soon the relevant date/time is, on a 0-100 scale — closer means
  * higher, and it decays linearly to 0 by `URGENCY_WINDOW_HOURS` out.
@@ -117,19 +124,70 @@ function relevantInstant(announcement: PriorityScoreInput): Date | null {
  * defaulting to either extreme.
  */
 export function computeUrgencyScore(announcement: PriorityScoreInput, now: Date): number {
-  const instant = relevantInstant(announcement);
-  if (!instant) return NO_DATE_URGENCY;
-
-  const hoursUntil = (instant.getTime() - now.getTime()) / (1000 * 60 * 60);
+  const hoursUntil = hoursUntilRelevantInstant(announcement, now);
+  if (hoursUntil === null) return NO_DATE_URGENCY;
   if (hoursUntil < 0) return 0;
 
   const clampedHours = Math.min(hoursUntil, URGENCY_WINDOW_HOURS);
   return 100 * (1 - clampedHours / URGENCY_WINDOW_HOURS);
 }
 
-/** urgency (0-100) × consequence weight (0.2-1.0) — same shape as the generated `priority_score` column's own formula. */
+/**
+ * Real bug found in testing: an `opportunity` closing TODAY (irreversibly —
+ * miss it and it's gone) lost the URGENT ribbon to a `registered_update`
+ * happening this Friday (a room/time change, no real consequence to
+ * missing the old info). Root cause: the linear urgency decay above is
+ * gentle enough over its 2-week window that a few days' difference barely
+ * moves the score, so the consequence-weight gap (`registered_update` at
+ * 1.0 vs. `opportunity` at 0.6) ends up dominating the ranking even when
+ * the actual time-sensitivity is wildly different — e.g. due-today
+ * (urgency 100) × 0.6 = 60, vs. due-in-4-days (urgency ≈71) × 1.0 = 71.
+ *
+ * 24 hours: a genuine, deliberate product judgment call, same as
+ * `CONSEQUENCE_WEIGHTS` above — not derived from anything, so the
+ * reasoning is spelled out here rather than left implicit. "Today" is the
+ * natural boundary for "you will plausibly miss this before you'd
+ * otherwise see it again" — a student checking the dashboard once a day is
+ * the baseline this whole app is designed around (`formatCapMeta`'s own
+ * "Today"/"Tomorrow" labels draw the same line), so anything inside that
+ * window needs to outrank everything else regardless of category, and
+ * anything outside it can safely wait for the ordinary formula to sort it
+ * among its peers.
+ */
+const NEAR_TERM_URGENCY_THRESHOLD_HOURS = 24;
+
+function isNearTerm(announcement: PriorityScoreInput, now: Date): boolean {
+  const hoursUntil = hoursUntilRelevantInstant(announcement, now);
+  return hoursUntil !== null && hoursUntil >= 0 && hoursUntil <= NEAR_TERM_URGENCY_THRESHOLD_HOURS;
+}
+
+/**
+ * urgency (0-100) × consequence weight (0.2-1.0) — same shape as the
+ * generated `priority_score` column's own formula — EXCEPT for a genuine
+ * near-term floor: anything due within `NEAR_TERM_URGENCY_THRESHOLD_HOURS`
+ * scores its raw urgency directly, with the consequence-weight multiplier
+ * skipped entirely, not just dampened. This isn't a number tweak on top of
+ * the existing formula; it's a real branch, because no amount of weight
+ * tuning can fix the underlying problem: the weight table has to keep
+ * ranking categories sensibly across the ENTIRE 2-week window, so it can
+ * never be steep enough, on its own, to guarantee "due in the next few
+ * hours" beats "due in several days" for every category pairing — that
+ * requires timing to categorically override category once things are
+ * genuinely close. Within the near-term window, urgency alone already
+ * ranges ~92.9-100 (only 24 of the full 336-hour decay window), which is
+ * high enough that no item outside the window — even a top-weight
+ * (1.0) one — can out-score it under the ordinary formula (that would
+ * require its own urgency > ~92.9, i.e. also being within 24 hours,
+ * i.e. also qualifying for this same floor). A student a few hours from
+ * missing a one-time opportunity should never lose the ribbon to a
+ * same-week schedule change, no matter which category either belongs to.
+ */
 export function computePriorityScore(announcement: PriorityScoreInput, now: Date): number {
-  return computeUrgencyScore(announcement, now) * CONSEQUENCE_WEIGHTS[announcement.category];
+  const urgency = computeUrgencyScore(announcement, now);
+  if (isNearTerm(announcement, now)) {
+    return urgency;
+  }
+  return urgency * CONSEQUENCE_WEIGHTS[announcement.category];
 }
 
 /**

@@ -38,7 +38,9 @@ describe("timetableEntrySchema", () => {
     const result = timetableEntrySchema.safeParse({ ...valid, start_time: "9am" });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(fieldErrorsFromZod(result.error).start_time).toBe("Use a 24-hour HH:MM time.");
+      expect(fieldErrorsFromZod(result.error).start_time).toBe(
+        "Enter a complete time, including AM/PM (e.g. 09:00 AM).",
+      );
     }
   });
 

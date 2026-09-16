@@ -137,6 +137,16 @@
   margin-bottom: 0;
 }
 
+/* Sits directly under a TextField (which already has its own 16px bottom
+   margin), explaining what a field is used for beyond just validation —
+   e.g. the class-name field's role in class-scoped announcement sharing. */
+.fieldHint {
+  margin: -10px 0 16px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
 .formError {
   background: var(--warn-bg);
   border: 2px dashed var(--warn-line);

@@ -23,3 +23,14 @@
   border-radius: 18px;
   box-shadow: 6px 6px 0 var(--sage);
 }
+
+/* Explains this page's cross-class scope, right under the section label.
+   #ddf0df is the same "secondary text on dark canvas" value ../shell.module.css's
+   own .heroLabel/.emptyState already use — not a new color for this note. */
+.pageNote {
+  font-size: 13px;
+  color: #ddf0df;
+  line-height: 1.5;
+  margin: -10px 0 20px;
+  max-width: 560px;
+}
