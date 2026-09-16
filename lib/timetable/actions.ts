@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { syncClashesForStudent } from "@/lib/deterministic/sync";
+import { syncClashesForStudent, matchTimetableEntryToExistingCancellations } from "@/lib/deterministic/sync";
+import type { TimetableEntryRow } from "@/lib/deterministic/types";
 
 /**
  * Timetable CRUD Server Actions. No UI calls these yet — the real
@@ -57,7 +58,19 @@ export async function addTimetableEntry(
     throw new Error(`Failed to add timetable entry: ${error?.message}`);
   }
 
-  await syncClashesForStudent(createAdminClient(), studentId);
+  const admin = createAdminClient();
+  await syncClashesForStudent(admin, studentId);
+  // Rule 5, third direction (lib/deterministic/sync.ts's own doc comment) —
+  // this new entry might match a cancellation that already exists.
+  const newEntry: TimetableEntryRow = {
+    id: data.id as string,
+    student_id: studentId,
+    day_of_week: input.day_of_week,
+    start_time: input.start_time,
+    end_time: input.end_time,
+    course_name: input.course_name,
+  };
+  await matchTimetableEntryToExistingCancellations(admin, newEntry);
 
   return { id: data.id as string };
 }
@@ -69,15 +82,26 @@ export async function updateTimetableEntry(
   const supabase = await createClient();
   const studentId = await requireStudentId(supabase);
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("timetable_entries")
     .update(input)
     .eq("id", id)
-    .eq("student_id", studentId); // RLS already enforces this; explicit for defense-in-depth
+    .eq("student_id", studentId) // RLS already enforces this; explicit for defense-in-depth
+    .select("id, student_id, day_of_week, start_time, end_time, course_name")
+    .single();
 
-  if (error) throw new Error(`Failed to update timetable entry: ${error.message}`);
+  if (error || !data) {
+    throw new Error(`Failed to update timetable entry: ${error?.message}`);
+  }
 
-  await syncClashesForStudent(createAdminClient(), studentId);
+  const admin = createAdminClient();
+  await syncClashesForStudent(admin, studentId);
+  // Same reasoning as addTimetableEntry above — an edit can change the
+  // day/time/course name to newly match a cancellation it didn't before
+  // (or stop matching one it did; matchTimetableEntryToExistingCancellations
+  // only ever adds rows, it doesn't need to remove a now-stale one since
+  // the original match was still correct at the time it was created).
+  await matchTimetableEntryToExistingCancellations(admin, data as TimetableEntryRow);
 }
 
 export async function deleteTimetableEntry(id: string): Promise<void> {

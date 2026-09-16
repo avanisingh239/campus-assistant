@@ -185,6 +185,77 @@ export async function syncFreeSlotsForCancellation(
 }
 
 /**
+ * Rule 5, the third direction — the one that was missing until this fix:
+ * when a timetable entry is *added or edited*, check it against every
+ * existing `cancellation` announcement, in case one already describes a
+ * class that now matches this entry. Real scenario that exposed the gap: a
+ * cancellation for "BEE, Monday 2-3pm" ingested before the student had
+ * "BEE" on their timetable at all — `syncFreeSlotsForCancellation` (above)
+ * only checks a *new* cancellation against *existing* timetable entries,
+ * so a cancellation that arrived first, with no matching entry yet, never
+ * got a second look once one was finally added.
+ *
+ * Reuses `findFreeSlotCandidate` exactly as-is — the same matching rule
+ * (day-of-week + `classNameTextConfidence` + `match_confidence`) `
+ * syncFreeSlotsForCancellation` already runs, just called once per
+ * existing cancellation with a single-entry list instead of once per new
+ * cancellation across every entry. No new matching logic, so this can't
+ * drift out of sync with the forward direction.
+ *
+ * Called from lib/timetable/actions.ts on both add and edit — an edit can
+ * change an entry's day/time/course name, any of which could newly match
+ * (or newly stop matching) a cancellation it didn't/did before, so this
+ * has to re-run on every edit, not just on create.
+ *
+ * Guards against inserting a duplicate `free_slots` row for a
+ * (timetable_entry_id, cancellation_announcement_id) pair the entry
+ * already matched on a previous add/edit — `free_slots` has no unique
+ * constraint of its own, so a repeatedly-edited entry that keeps matching
+ * the same cancellation would otherwise pile up duplicate rows.
+ *
+ * Deliberately does NOT also run the "check existing event/opportunity
+ * announcements against the newly freed slot" second half
+ * `syncFreeSlotsForCancellation` does — a free slot created here still
+ * gets picked up by `matchAnnouncementToOpenFreeSlots` the moment any
+ * *future* event/opportunity is created (that function scans every open
+ * slot table-wide, not just freshly created ones), so the only edge this
+ * leaves is an opportunity that already existed before this specific slot
+ * was created; narrower in scope than what the task asked for, and not
+ * the bug that was reported.
+ */
+export async function matchTimetableEntryToExistingCancellations(
+  supabase: SupabaseClient,
+  entry: TimetableEntryRow,
+): Promise<{ freeSlotCount: number }> {
+  const { data: cancellations, error: cancelError } = await supabase
+    .from("announcements")
+    .select("id, category, event_date, start_time, end_time, linked_class_name, match_confidence")
+    .eq("category", "cancellation");
+  if (cancelError) throw new Error(`Failed to load cancellation announcements: ${cancelError.message}`);
+  if (!cancellations || cancellations.length === 0) return { freeSlotCount: 0 };
+
+  const { data: existingSlots, error: existingError } = await supabase
+    .from("free_slots")
+    .select("cancellation_announcement_id")
+    .eq("timetable_entry_id", entry.id);
+  if (existingError) throw new Error(`Failed to load existing free slots: ${existingError.message}`);
+  const alreadyMatched = new Set(
+    (existingSlots ?? []).map((s) => s.cancellation_announcement_id as string),
+  );
+
+  const newCandidates = (cancellations as AnnouncementForDeterministicEngine[])
+    .filter((cancellation) => !alreadyMatched.has(cancellation.id))
+    .flatMap((cancellation) => findFreeSlotCandidate(cancellation, [entry]));
+
+  if (newCandidates.length === 0) return { freeSlotCount: 0 };
+
+  const { error: insertError } = await supabase.from("free_slots").insert(newCandidates);
+  if (insertError) throw new Error(`Failed to insert free_slots: ${insertError.message}`);
+
+  return { freeSlotCount: newCandidates.length };
+}
+
+/**
  * Rule 5, the other direction: when a NEW `event`/`opportunity`
  * announcement is created, check it against every open (unmatched)
  * `free_slots` row, in case it fits into a slot freed by an earlier
