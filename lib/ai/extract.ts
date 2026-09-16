@@ -145,7 +145,7 @@ export async function extractAnnouncements(
       }
 
       return result.data.announcements;
-    }     } catch (err) {
+    } catch (err) {
       if (err instanceof ApiError) {
         console.error("GEMINI_API_ERROR", err.status, JSON.stringify(err, null, 2));
       }
