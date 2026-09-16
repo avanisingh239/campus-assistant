@@ -36,6 +36,10 @@ export function HowThisWorks() {
             tracking — it&apos;s what powers scheduling-clash detection and prioritization. Items you
             haven&apos;t responded to won&apos;t be checked for conflicts.
           </p>
+          <p>
+            <strong>Events</strong> and <strong>opportunities</strong> are shown to everyone on the
+            platform, not just your class — so you don&apos;t miss things happening elsewhere on campus.
+          </p>
         </div>
       )}
     </div>
