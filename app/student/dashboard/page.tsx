@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { shapeAnnouncements } from "@/lib/dashboard/shape-announcements";
 import { buildDiffSummary } from "@/lib/dashboard/diff-summary";
-import { pickUrgentAnnouncementId, sortByPriorityScore } from "@/lib/dashboard/priority";
+import { pickUrgentAnnouncementIds, sortByPriorityScore } from "@/lib/dashboard/priority";
 import { DashboardClient } from "./dashboard-client";
 
 // Never statically prerendered — it's a per-student, RLS-scoped fetch.
@@ -125,13 +125,13 @@ export default async function StudentDashboardPage() {
   // is the card feed's actual sort now, not the DB query's now-dropped
   // (always-0) priority_score order above.
   const announcements = sortByPriorityScore(shapedAnnouncements, now);
-  const urgentId = pickUrgentAnnouncementId(announcements, now);
+  const urgentIds = pickUrgentAnnouncementIds(announcements, now);
   const diffSummary = buildDiffSummary(announcements, lastSeenResult.data?.last_seen_at ?? null);
 
   return (
     <DashboardClient
       announcements={announcements}
-      urgentId={urgentId}
+      urgentIds={urgentIds}
       diffSummary={diffSummary}
       nowIso={now.toISOString()}
       clashes={clashesResult.data ?? []}

@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractAnnouncements, ExtractionError } from "@/lib/ai/extract";
 import {
@@ -183,6 +184,26 @@ export async function ingestRawText(
       await matchAnnouncementToOpenFreeSlots(supabase, announcementId);
     }
   }
+
+  // Real bug found in testing: submitting a message here and then
+  // navigating to the dashboard (or Don't Miss This, or the timetable, if
+  // a cancellation matched an existing entry) could keep showing stale
+  // data until a manual hard refresh. All three of those pages are
+  // force-dynamic (always re-fetch on the server), but that alone doesn't
+  // invalidate the Router Cache Next.js keeps client-side for routes
+  // already visited this session — a soft `<Link>` navigation back to one
+  // of them (e.g. result-panel.tsx's "View on your dashboard") could still
+  // be served the last cached RSC payload from before this mutation. A
+  // brand-new announcement can affect any of the three (the dashboard
+  // always; Don't Miss This if it's an opportunity/seat-limited event; the
+  // timetable if a cancellation here just matched an existing entry via
+  // syncFreeSlotsForCancellation above), so all three are revalidated
+  // unconditionally rather than trying to predict which one a given batch
+  // touched. Called once per extracted item in a batch — revalidatePath is
+  // idempotent, so the repetition is harmless.
+  revalidatePath("/student/dashboard");
+  revalidatePath("/student/dont-miss-this");
+  revalidatePath("/student/timetable");
 
   return {
     messageId: message.id as string,
