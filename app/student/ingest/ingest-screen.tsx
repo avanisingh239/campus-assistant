@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ingestRawText } from "@/lib/ingestion/ingest";
 import { parseWhatsAppExport } from "@/lib/ingestion/whatsapp-parser";
+import { computeBatchDelays } from "@/lib/ingestion/throttle";
 import type { IngestedAnnouncementSummary, IngestSourceType } from "@/lib/ingestion/types";
 import { CanvasBackground } from "@/components/canvas-background";
 import { ChatBubbleIcon } from "@/components/icons";
@@ -18,14 +19,22 @@ import styles from "./ingest.module.css";
 type Screen = "choose" | "paste" | "upload" | "processing" | "result";
 
 /**
- * Gemini's free tier caps at roughly 10 requests/minute
- * (lib/ai/extract.ts), and this page calls it once per message in a batch
- * — a huge .txt export would mean a huge number of sequential, increasingly
- * backed-off requests. Cap it to keep a demo upload from taking minutes;
- * the result panel says plainly when this truncated something rather than
- * silently dropping the rest.
+ * A real quota check against the live Google AI Studio console (not just
+ * documentation) found this project's Gemini key capped at roughly 5
+ * requests/minute and ~100/day (lib/ai/gemini.ts) — this page calls it
+ * once per message in a batch, so a huge .txt export would mean a huge
+ * number of sequential, increasingly throttled/backed-off requests. Cap
+ * it to keep a demo upload from taking many minutes; the result panel
+ * says plainly when this truncated something rather than silently
+ * dropping the rest. `runIngest` below spaces each call out
+ * (lib/ingestion/throttle.ts) so a batch this size stays under the
+ * per-minute ceiling with a safety margin, on top of this cap.
  */
 const MAX_BATCH_SIZE = 25;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 interface PendingRun {
   sourceType: IngestSourceType;
@@ -66,9 +75,25 @@ export function IngestScreen({ studentId, now }: { studentId: string; now: Date 
     let failureCount = 0;
     let firstErrorMessage: string | null = null;
 
+    // Real quota check against the live Google AI Studio console: this
+    // project's Gemini key is capped at roughly 5 requests/minute — tight
+    // enough that a batch upload's own sequential calls (one per message)
+    // can exhaust it in a single submission. Spacing them out keeps the
+    // batch under that ceiling with a safety margin (lib/ingestion/
+    // throttle.ts). A single one-off paste (run.messages.length === 1)
+    // always gets an all-zero delay array, so this never slows down a
+    // normal paste submission — only real batches wait.
+    const delays = computeBatchDelays(run.messages.length);
+
     for (let i = 0; i < run.messages.length; i++) {
+      // Progress advances BEFORE the throttle wait, not after — otherwise
+      // the bar would sit frozen on the previous count for the whole
+      // delay, which reads as a hang rather than a deliberate pause.
       if (run.messages.length > 1) {
         setProgress({ current: i + 1, total: run.messages.length });
+      }
+      if (delays[i] > 0) {
+        await sleep(delays[i]);
       }
       try {
         const result = await ingestRawText(run.messages[i], {

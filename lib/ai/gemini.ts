@@ -1,9 +1,11 @@
 import "server-only";
 import { GoogleGenAI } from "@google/genai";
+import { parseGeminiApiKeys } from "./gemini-keys";
 
 /**
  * Gemini API client for the extraction pipeline (docs/ai-contracts.md).
- * Resolves GEMINI_API_KEY from the environment — never hardcode a key.
+ * Resolves one or more keys from the environment via `getGeminiApiKeys`
+ * below — never hardcode a key.
  *
  * Provider: Google Gemini (`@google/genai`), not the Claude API. This is a
  * cost-driven choice, not a capability-driven one — see CLAUDE.md for the
@@ -20,23 +22,53 @@ import { GoogleGenAI } from "@google/genai";
  * switch to the `gemini-flash-latest` alias, which always points at
  * whatever Google currently considers the standard flash model — trading
  * predictability (this repo could start behaving differently with no code
- * change) for never needing this fix again. If the free tier's ~10 req/min
- * cap turns out too tight even with the retry/backoff in lib/ai/extract.ts,
- * `gemini-3.1-flash-lite` is the lighter/cheaper alternative to try next.
+ * change) for never needing this fix again.
+ *
+ * A real quota check against the live Google AI Studio console (not just
+ * documentation) found this project's actual key is capped at roughly 5
+ * requests/minute and ~100/day — tighter than the free tier's general
+ * ~10/min figure this file used to cite. See lib/ingestion/throttle.ts
+ * (batch request spacing) and this file's key rotation below for the two
+ * mitigations that followed from that; `gemini-3.1-flash-lite` remains the
+ * lighter/cheaper model to try next if this still isn't enough.
  */
 export const GEMINI_MODEL = "gemini-3.6-flash";
 
-let client: GoogleGenAI | null = null;
+/**
+ * Resolves the configured Gemini API key(s) — `GEMINI_API_KEYS`
+ * (comma-separated) if set, else the older single-key `GEMINI_API_KEY` for
+ * backward compatibility. This is the only place `process.env` is actually
+ * read; `parseGeminiApiKeys` (lib/ai/gemini-keys.ts) stays pure and
+ * unit-tested, taking a plain object instead of the real environment.
+ */
+export function getGeminiApiKeys(): string[] {
+  const keys = parseGeminiApiKeys({
+    GEMINI_API_KEYS: process.env.GEMINI_API_KEYS,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  });
+  if (keys.length === 0) {
+    throw new Error(
+      "Missing GEMINI_API_KEYS (or the older GEMINI_API_KEY). Copy .env.example to .env.local " +
+        "and fill in a free key from https://aistudio.google.com/apikey — comma-separate " +
+        "multiple keys in GEMINI_API_KEYS for rotation headroom beyond one key's own rate limit.",
+    );
+  }
+  return keys;
+}
 
-export function getGeminiClient(): GoogleGenAI {
+const clientsByKey = new Map<string, GoogleGenAI>();
+
+/**
+ * One memoized client per key, not a single shared client — lib/ai/
+ * extract.ts's rotation loop calls this once per key it tries, and each
+ * key needs its own `GoogleGenAI` instance (the SDK binds an API key at
+ * construction time).
+ */
+export function getGeminiClientForKey(apiKey: string): GoogleGenAI {
+  let client = clientsByKey.get(apiKey);
   if (!client) {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error(
-        "Missing GEMINI_API_KEY. Copy .env.example to .env.local and fill it " +
-          "in with a free key from https://aistudio.google.com/apikey.",
-      );
-    }
-    client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    client = new GoogleGenAI({ apiKey });
+    clientsByKey.set(apiKey, client);
   }
   return client;
 }
