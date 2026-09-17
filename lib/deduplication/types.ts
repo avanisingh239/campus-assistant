@@ -15,6 +15,16 @@ export interface DedupFields {
   deadline_at: string | null;
   linked_class_name: string | null;
   seat_count: number | null;
+  /**
+   * The title's semantic embedding (lib/ai/embed.ts's `embedTitle`),
+   * computed once at ingestion time — `null` when embedding failed/rate-
+   * limited for this item (see embed.ts's own doc comment) or when the
+   * candidate predates this feature and never had one computed at all.
+   * Either way, `null` is a real, expected value, not an error state —
+   * lib/deduplication/embedding-similarity.ts's `embeddingsIndicateMatch`
+   * always treats it as "can't compare," never as "assume similar."
+   */
+  title_embedding: number[] | null;
 }
 
 /**

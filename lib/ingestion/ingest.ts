@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractAnnouncements, ExtractionError } from "@/lib/ai/extract";
+import { embedTitle } from "@/lib/ai/embed";
 import {
   syncFreeSlotsForCancellation,
   matchAnnouncementToOpenFreeSlots,
@@ -115,7 +116,18 @@ export async function ingestRawText(
   const announcementIds: string[] = [];
   const announcements: IngestedAnnouncementSummary[] = [];
   for (const item of extracted) {
-    const row = toAnnouncementRow(item, trimmed);
+    // Real ML upgrade to dedup's title-matching (see lib/deduplication/
+    // match.ts's own doc comment for the full reasoning): one embedding
+    // call per extracted item, computed BEFORE the dedup check since that
+    // check needs it — never re-embedding an existing candidate, which
+    // already has its own `title_embedding` stored from when IT was
+    // created. `embedTitle` (lib/ai/embed.ts) never throws — a failed/
+    // rate-limited call logs and resolves to `null`, which the dedup
+    // matcher already treats as "fall back to the exact linked_class_name
+    // path only for this item," never as a reason to fail the whole
+    // ingestion.
+    const titleEmbedding = await embedTitle(item.title);
+    const row = { ...toAnnouncementRow(item, trimmed), title_embedding: titleEmbedding };
 
     const dedupResult = await findAndMergeDuplicate(
       supabase,

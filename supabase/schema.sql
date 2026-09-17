@@ -175,6 +175,22 @@ create table announcements (
   consequence_weight numeric,          -- from a hardcoded lookup table (7.2)
   priority_score numeric generated always as (coalesce(urgency_score,0) * coalesce(consequence_weight,1)) stored,
 
+  -- 2.6 dedup, ML upgrade: a plain-array Gemini embedding of `title` (see
+  -- lib/ai/embed.ts / lib/deduplication/embedding-similarity.ts), computed
+  -- once at ingestion time and used as a cosine-similarity alternative to
+  -- the exact linked_class_name match path when neither side has one. jsonb
+  -- (a plain numeric array), not a pgvector column — deliberately, per the
+  -- task that added this: at this project's scale, comparing a small set
+  -- of same-category candidate rows in application code is simpler and
+  -- sufficient, and doesn't need a new Postgres extension dependency.
+  -- Nullable, and expected to genuinely be null sometimes: every
+  -- pre-existing row from before this column existed, and any row whose
+  -- embedding call failed/rate-limited at ingestion time (embed.ts's own
+  -- graceful-fallback doc comment) — lib/deduplication/embedding-similarity.ts's
+  -- `embeddingsIndicateMatch` always treats a null on either side as "can't
+  -- compare," never as "assume similar."
+  title_embedding jsonb,
+
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -492,6 +508,36 @@ create policy "admin reads own scope" on admin_scopes
 -- visible to everyone — the safe direction to fail in. Old test data is
 -- effectively retired, not migrated; submit fresh data after this runs to
 -- test class-scoping again (see CLAUDE.md for the exact steps).
+-- ============================================================
+
+
+-- ============================================================
+-- ADDED — Embedding-based semantic dedup matching (see CLAUDE.md's
+-- §Deduplication engine section, "real ML upgrade" note). The dedup
+-- engine's fallback match path (when neither side has a `linked_class_name`)
+-- used to be plain Jaccard word-overlap over each title's stopword-stripped
+-- words — replaced with real Gemini semantic embeddings, compared by
+-- cosine similarity in application code (lib/deduplication/
+-- embedding-similarity.ts), so two genuinely-paraphrased titles with zero
+-- shared words can still be recognized as the same notice.
+--
+-- This is a NEW COLUMN only — no policy change, since it's read/written
+-- through the exact same service-role client every other `announcements`
+-- column already goes through:
+--
+--   alter table announcements add column title_embedding jsonb;
+--
+-- Deliberately jsonb (a plain numeric array), not a `pgvector` column —
+-- no new Postgres extension dependency for a project this size, where
+-- comparing a small set of same-category candidate rows in application
+-- code is simpler and just as correct. Every pre-existing `announcements`
+-- row gets `title_embedding = null` after this runs (there's no text left
+-- to retroactively embed against a specific historical moment, and
+-- there's no need to — a null is a real, handled value throughout this
+-- feature, not an error state: `embeddingsIndicateMatch` always treats it
+-- as "can't compare," so an old row just falls back to being matchable
+-- only via the exact `linked_class_name` path, same as it always was
+-- before this column existed).
 -- ============================================================
 
 

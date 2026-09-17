@@ -1,5 +1,6 @@
 import type { AnnouncementCategory } from "@/lib/dashboard/types";
 import { classNameTextConfidence } from "@/lib/deterministic/free-slots";
+import { embeddingsIndicateMatch } from "./embedding-similarity";
 import type { DedupCandidate, DedupFields } from "./types";
 
 /**
@@ -19,7 +20,7 @@ import type { DedupCandidate, DedupFields } from "./types";
  * How far back (in days) `lib/deduplication/sync.ts`'s candidate query
  * looks for a merge target. This is a scale/performance bound only, not a
  * correctness one — the actual "is this the same real-world thing" answer
- * comes entirely from `datesAreClose`/`classOrTitleMatch` below, which
+ * comes entirely from `datesAreClose`/`classOrEmbeddingMatches` below, which
  * already require the two dates to be genuinely close regardless of how far
  * apart the two *messages* were sent. 60 days comfortably covers a
  * semester's worth of the kind of deadline that gets re-announced closer to
@@ -88,71 +89,6 @@ function datesAreClose(a: DedupFields, b: DedupFields): boolean {
   return false;
 }
 
-/** Common English function words, stripped before computing title overlap so two titles don't "match" purely on shared filler words. */
-const TITLE_STOPWORDS = new Set([
-  "a", "an", "the", "is", "are", "was", "were", "be", "been", "of", "for",
-  "to", "in", "on", "at", "by", "and", "or", "with", "this", "that", "your",
-  "you", "will", "due", "please", "note", "update", "class", "today",
-  "tomorrow",
-]);
-
-function titleWords(title: string): Set<string> {
-  return new Set(
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
-      .split(/\s+/)
-      .filter((w) => w.length > 1 && !TITLE_STOPWORDS.has(w)),
-  );
-}
-
-/**
- * Word-overlap similarity, 0-1: plain Jaccard index (`intersection / union`)
- * over each title's stopword-stripped distinct words — a reasonable,
- * deterministic, no-AI-call heuristic per the task's own explicit
- * instruction. An earlier version of this function divided by the SHORTER
- * title's word count instead (to avoid penalizing one title simply being
- * more verbose than the other), but that scored "Library fee deadline" vs.
- * "Hostel fee deadline" — two different fees, one word apart — at 0.67,
- * above the threshold below: a real false-merge risk, and exactly the
- * failure mode the task's own "be conservative" instruction warns about.
- * Standard Jaccard scores that same pair at 0.5 (2 shared words over a
- * 4-word union), correctly below threshold, while still scoring a genuine
- * same-notice paraphrase like "DBMS Assignment 3 Deadline" vs. "DBMS
- * Assignment 3 Deadline Extended to Friday" at 0.6 (3 shared words over a
- * 5-word union) — right at the line, not below it. Union-based scoring
- * naturally penalizes a one-word swap between otherwise-short titles more
- * than it penalizes extra trailing words on an otherwise-fully-contained
- * title, which is the correct asymmetry for this task.
- */
-export function titleSimilarity(a: string, b: string): number {
-  const wordsA = titleWords(a);
-  const wordsB = titleWords(b);
-  if (wordsA.size === 0 || wordsB.size === 0) return 0;
-
-  let intersection = 0;
-  for (const word of wordsA) {
-    if (wordsB.has(word)) intersection++;
-  }
-  const union = wordsA.size + wordsB.size - intersection;
-  return intersection / union;
-}
-
-/**
- * 0.6: picked, like the priority-scoring pass's consequence-weight table,
- * as a deliberate product judgment call rather than derived from anything.
- * `titleSimilarity`'s own doc comment walks through the two examples this
- * exact number sits between: low enough to still catch a real
- * same-notice paraphrase with extra trailing words (0.6, right at the
- * line), high enough that two merely-topically-similar titles naming two
- * different actual things, one word apart ("Library fee deadline" vs.
- * "Hostel fee deadline", 0.5), don't clear it. Combined with the
- * date-closeness gate above, which already has to match first — this
- * threshold only has to disambiguate among same-category, same-date
- * candidates, not the whole announcements table.
- */
-const TITLE_SIMILARITY_THRESHOLD = 0.6;
-
 /**
  * `linked_class_name` comparison for merge purposes reuses
  * `classNameTextConfidence` (lib/deterministic/free-slots.ts) — the same
@@ -169,19 +105,37 @@ function linkedClassNameMatches(a: DedupFields, b: DedupFields): boolean {
 
 /**
  * The task's third condition: same `linked_class_name` when both sides
- * have one, OR sufficiently similar title text when they don't (e.g. a
- * campus-wide `event` with no specific course attached). `linked_class_name`
- * is checked first and, if both sides have one, is the ONLY signal used —
- * two announcements about the same course with wildly different titles
- * (e.g. one paraphrased far more than the other) should still be allowed to
- * merge, and requiring title similarity on top would defeat the point of
- * having a more reliable structured signal available.
+ * have one, OR sufficiently similar title *meaning* when they don't (e.g.
+ * a campus-wide `event` with no specific course attached).
+ * `linked_class_name` is checked first and, if both sides have one, is the
+ * ONLY signal used — two announcements about the same course with wildly
+ * different titles (e.g. one paraphrased far more than the other) should
+ * still be allowed to merge, and requiring embedding similarity on top
+ * would defeat the point of having a more reliable structured signal
+ * available.
+ *
+ * Real ML upgrade, replacing this file's original plain Jaccard
+ * word-overlap check (`titleSimilarity`, removed in this pass — see git
+ * history for its old reasoning if it's ever needed again): word-overlap
+ * math can't tell "DBMS Assignment 3 Deadline" and "The database systems
+ * homework 3 due date" are the same notice paraphrased two different ways
+ * (zero shared words, so Jaccard scored it 0), where a semantic embedding
+ * correctly places them close together. `embeddingsIndicateMatch`
+ * (lib/deduplication/embedding-similarity.ts) does the actual cosine-
+ * similarity comparison against each side's `title_embedding` — computed
+ * once per item at ingestion time (lib/ai/embed.ts's `embedTitle`, called
+ * from lib/ingestion/ingest.ts), not re-computed here. A `null` embedding
+ * on either side (an embedding call that failed/rate-limited for that
+ * item, or an older announcement ingested before this pass existed) makes
+ * this branch return `false` — the item can then still merge via the
+ * `linked_class_name` path above if it has one, but never via a guessed
+ * "probably similar enough."
  */
-function classOrTitleMatches(a: DedupFields, b: DedupFields): boolean {
+function classOrEmbeddingMatches(a: DedupFields, b: DedupFields): boolean {
   if (a.linked_class_name && b.linked_class_name) {
     return linkedClassNameMatches(a, b);
   }
-  return titleSimilarity(a.title, b.title) >= TITLE_SIMILARITY_THRESHOLD;
+  return embeddingsIndicateMatch(a.title_embedding, b.title_embedding);
 }
 
 /**
@@ -229,7 +183,7 @@ function sameSubmittingClass(classA: string | null, classB: string | null): bool
  * or `null`. Callers (lib/deduplication/sync.ts) are expected to have
  * already scoped `candidates` to the same category and the lookback
  * window — this function re-checks category defensively but does the real
- * date/class-or-title/class-scope decision.
+ * date/class-or-embedding/class-scope decision.
  */
 export function findDuplicateMatch(
   newItem: DedupFields,
@@ -239,7 +193,7 @@ export function findDuplicateMatch(
   for (const candidate of candidates) {
     if (candidate.category !== newItem.category) continue;
     if (!datesAreClose(newItem, candidate)) continue;
-    if (!classOrTitleMatches(newItem, candidate)) continue;
+    if (!classOrEmbeddingMatches(newItem, candidate)) continue;
 
     if (!ALWAYS_SHARED_CATEGORIES.has(newItem.category)) {
       if (!sameSubmittingClass(newSubmittedByClassName, candidate.submittedByClassName)) continue;

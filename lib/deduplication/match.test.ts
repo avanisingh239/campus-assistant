@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { ALWAYS_SHARED_CATEGORIES, findDuplicateMatch, titleSimilarity } from "./match";
+import { ALWAYS_SHARED_CATEGORIES, findDuplicateMatch } from "./match";
 import type { DedupCandidate, DedupFields } from "./types";
+
+// Unit vectors at known angles, so cosineSimilarity(CLOSE_EMBEDDING_A, x)
+// is just x's first component — the same fixture shape
+// embedding-similarity.test.ts uses, reused here so findDuplicateMatch's
+// embedding path can be exercised without a real Gemini call (see
+// lib/ai/embed.ts's own doc comment on why that can't happen in tests).
+const EMBEDDING_A = [1, 0]; // "the new item"
+const EMBEDDING_CLOSE = [0.9, Math.sqrt(1 - 0.9 ** 2)]; // cosine sim 0.9 vs. A — a real paraphrase
+const EMBEDDING_FAR = [0.3, Math.sqrt(1 - 0.3 ** 2)]; // cosine sim 0.3 vs. A — a different notice
 
 function fields(overrides: Partial<DedupFields> = {}): DedupFields {
   return {
@@ -12,6 +21,7 @@ function fields(overrides: Partial<DedupFields> = {}): DedupFields {
     deadline_at: "2026-05-05T18:00:00.000Z",
     linked_class_name: null,
     seat_count: null,
+    title_embedding: null,
     ...overrides,
   };
 }
@@ -25,33 +35,13 @@ function candidate(overrides: Partial<DedupCandidate> = {}): DedupCandidate {
   };
 }
 
-describe("titleSimilarity", () => {
-  it("scores 1 for identical (stopword-stripped) word sets", () => {
-    expect(titleSimilarity("Fee payment deadline", "The fee payment deadline")).toBe(1);
-  });
-
-  it("scores high when one title is a more verbose version of the other", () => {
-    const score = titleSimilarity(
-      "DBMS Assignment 3 Deadline",
-      "DBMS Assignment 3 Deadline Extended to Friday",
-    );
-    expect(score).toBeGreaterThanOrEqual(0.6);
-  });
-
-  it("scores low for topically-similar but actually-different titles", () => {
-    const score = titleSimilarity("Library fee deadline", "Hostel fee deadline");
-    expect(score).toBeLessThan(0.6);
-  });
-
-  it("scores 0 when either title has no meaningful words at all", () => {
-    expect(titleSimilarity("the a of", "Fee deadline")).toBe(0);
-  });
-});
-
 describe("findDuplicateMatch — same-class deadline merges", () => {
-  it("merges two matching deadline messages from the SAME class (same date, same title)", () => {
-    const newItem = fields({ title: "Database Systems fee deadline" });
-    const existing = candidate({ title: "Database Systems fee payment deadline" });
+  it("merges two matching deadline messages from the SAME class (same date, close title embeddings, real ML paraphrase upgrade)", () => {
+    const newItem = fields({ title: "Database Systems fee deadline", title_embedding: EMBEDDING_A });
+    const existing = candidate({
+      title: "Database Systems fee payment deadline",
+      title_embedding: EMBEDDING_CLOSE,
+    });
 
     expect(findDuplicateMatch(newItem, "CSE-2028-A", [existing])).toBe(existing);
   });
@@ -62,16 +52,17 @@ describe("findDuplicateMatch — same-class deadline merges", () => {
     // RLS-matching key) has nothing to do with which group chat a message
     // came from — a student's own class is the same regardless of which
     // of their class's several WhatsApp groups happened to forward it.
-    const newItem = fields({ title: "Database Systems fee deadline" });
+    const newItem = fields({ title: "Database Systems fee deadline", title_embedding: EMBEDDING_A });
     const existing = candidate({
       title: "Database Systems fee payment deadline",
+      title_embedding: EMBEDDING_CLOSE,
       submittedByClassName: "CSE-2028-A", // same class, implicitly a different group in practice
     });
 
     expect(findDuplicateMatch(newItem, "CSE-2028-A", [existing])).toBe(existing);
   });
 
-  it("merges via linked_class_name (exact after normalization) even when titles differ a lot", () => {
+  it("merges via linked_class_name (exact after normalization) even when embeddings are missing entirely", () => {
     const newItem = fields({
       title: "Reminder: pay your fees soon or face a late charge",
       linked_class_name: "  Database   Systems ",
@@ -81,18 +72,69 @@ describe("findDuplicateMatch — same-class deadline merges", () => {
     expect(findDuplicateMatch(newItem, "CSE-2028-A", [existing])).toBe(existing);
   });
 
-  it("does NOT merge on a merely-partial linked_class_name match (stricter than the free-slot engine's own 0.5 threshold)", () => {
+  it("does NOT merge on a merely-partial linked_class_name match (stricter than the free-slot engine's own 0.5 threshold), even with close embeddings", () => {
     const newItem = fields({
       title: "Reminder: pay your fees soon or face a late charge",
       linked_class_name: "DBMS",
+      title_embedding: EMBEDDING_A,
     });
-    const existing = candidate({ title: "Fee deadline", linked_class_name: "DBMS Lab" });
+    const existing = candidate({
+      title: "Fee deadline",
+      linked_class_name: "DBMS Lab",
+      title_embedding: EMBEDDING_CLOSE,
+    });
+
+    // linked_class_name is the ONLY signal used once both sides have one
+    // (see match.ts's classOrEmbeddingMatches doc comment) — a close
+    // embedding does not override a failed class-name match.
+    expect(findDuplicateMatch(newItem, "CSE-2028-A", [existing])).toBeNull();
+  });
+});
+
+describe("findDuplicateMatch — embedding-based semantic matching (the real ML upgrade)", () => {
+  it("merges two titles with ZERO shared words but a close embedding — exactly what plain word-overlap could never catch", () => {
+    const newItem = fields({
+      title: "DBMS Assignment 3 Deadline",
+      title_embedding: EMBEDDING_A,
+    });
+    const existing = candidate({
+      title: "The database systems homework 3 due date",
+      title_embedding: EMBEDDING_CLOSE,
+    });
+
+    expect(findDuplicateMatch(newItem, "CSE-2028-A", [existing])).toBe(existing);
+  });
+
+  it("does not merge two titles with a merely topically-similar (below-threshold) embedding", () => {
+    const newItem = fields({ title: "Library fee deadline", title_embedding: EMBEDDING_A });
+    const existing = candidate({ title: "Hostel fee deadline", title_embedding: EMBEDDING_FAR });
+
+    expect(findDuplicateMatch(newItem, "CSE-2028-A", [existing])).toBeNull();
+  });
+
+  it("does not merge when the new item's embedding is null (the documented graceful fallback — embedTitle failed/rate-limited for this item)", () => {
+    const newItem = fields({ title: "Database Systems fee deadline", title_embedding: null });
+    const existing = candidate({
+      title: "Database Systems fee payment deadline",
+      title_embedding: EMBEDDING_CLOSE,
+    });
+
+    expect(findDuplicateMatch(newItem, "CSE-2028-A", [existing])).toBeNull();
+  });
+
+  it("does not merge when the existing candidate's embedding is null (an older announcement ingested before this feature existed)", () => {
+    const newItem = fields({ title: "Database Systems fee deadline", title_embedding: EMBEDDING_A });
+    const existing = candidate({ title: "Database Systems fee payment deadline", title_embedding: null });
 
     expect(findDuplicateMatch(newItem, "CSE-2028-A", [existing])).toBeNull();
   });
 });
 
 describe("findDuplicateMatch — the privacy fix: class-scoped categories must not merge across classes", () => {
+  // All four tests below use close title embeddings on purpose — otherwise
+  // classOrEmbeddingMatches would fail on missing data BEFORE the
+  // privacy/class-scope check even runs, and these tests wouldn't actually
+  // be exercising the guard they're named for.
   it("does NOT merge two matching-but-different-class deadline messages", () => {
     // The exact case this pass exists to prevent: two classes' deadlines
     // that would otherwise look identical (same category, same date, same
@@ -100,9 +142,10 @@ describe("findDuplicateMatch — the privacy fix: class-scoped categories must n
     // its own class — merging them would give the announcements RLS
     // policy's "readable if ANY linked source's class matches" logic a row
     // with sources from both classes attached.
-    const newItem = fields({ title: "Database Systems fee deadline" });
+    const newItem = fields({ title: "Database Systems fee deadline", title_embedding: EMBEDDING_A });
     const existingFromOtherClass = candidate({
       title: "Database Systems fee payment deadline",
+      title_embedding: EMBEDDING_CLOSE,
       submittedByClassName: "ECE-2027-B",
     });
 
@@ -110,22 +153,22 @@ describe("findDuplicateMatch — the privacy fix: class-scoped categories must n
   });
 
   it("does not merge when the new message's class is unknown (null)", () => {
-    const newItem = fields();
-    const existing = candidate({ submittedByClassName: "CSE-2028-A" });
+    const newItem = fields({ title_embedding: EMBEDDING_A });
+    const existing = candidate({ title_embedding: EMBEDDING_CLOSE, submittedByClassName: "CSE-2028-A" });
 
     expect(findDuplicateMatch(newItem, null, [existing])).toBeNull();
   });
 
   it("does not merge when the existing candidate's class is unknown (null)", () => {
-    const newItem = fields();
-    const existing = candidate({ submittedByClassName: null });
+    const newItem = fields({ title_embedding: EMBEDDING_A });
+    const existing = candidate({ title_embedding: EMBEDDING_CLOSE, submittedByClassName: null });
 
     expect(findDuplicateMatch(newItem, "CSE-2028-A", [existing])).toBeNull();
   });
 
   it("class comparison is case/whitespace-insensitive, matching the RLS policy's own comparison", () => {
-    const newItem = fields();
-    const existing = candidate({ submittedByClassName: "  cse-2028-a  " });
+    const newItem = fields({ title_embedding: EMBEDDING_A });
+    const existing = candidate({ title_embedding: EMBEDDING_CLOSE, submittedByClassName: "  cse-2028-a  " });
 
     expect(findDuplicateMatch(newItem, "CSE-2028-A", [existing])).toBe(existing);
   });
@@ -140,6 +183,7 @@ describe("findDuplicateMatch — always-shared categories merge across classes f
       start_time: "09:00",
       end_time: "10:00",
       deadline_at: null,
+      title_embedding: EMBEDDING_A,
     });
     const existing = candidate({
       category: "event",
@@ -148,6 +192,7 @@ describe("findDuplicateMatch — always-shared categories merge across classes f
       start_time: "09:00",
       end_time: "10:00",
       deadline_at: null,
+      title_embedding: EMBEDDING_CLOSE,
       submittedByClassName: "ECE-2027-B",
     });
 
@@ -170,6 +215,7 @@ describe("findDuplicateMatch — genuinely different things must NOT merge", () 
       start_time: "09:00",
       end_time: "10:00",
       deadline_at: null,
+      title_embedding: EMBEDDING_A,
     });
     const existing = candidate({
       category: "event",
@@ -178,6 +224,7 @@ describe("findDuplicateMatch — genuinely different things must NOT merge", () 
       start_time: "09:00",
       end_time: "10:00",
       deadline_at: null,
+      title_embedding: EMBEDDING_FAR,
     });
 
     expect(findDuplicateMatch(newItem, "CSE-2028-A", [existing])).toBeNull();
@@ -198,8 +245,8 @@ describe("findDuplicateMatch — genuinely different things must NOT merge", () 
   });
 
   it("merges deadlines within the 24h tolerance", () => {
-    const newItem = fields({ deadline_at: "2026-05-05T23:59:00.000Z" });
-    const existing = candidate({ deadline_at: "2026-05-06T10:00:00.000Z" });
+    const newItem = fields({ deadline_at: "2026-05-05T23:59:00.000Z", title_embedding: EMBEDDING_A });
+    const existing = candidate({ deadline_at: "2026-05-06T10:00:00.000Z", title_embedding: EMBEDDING_CLOSE });
 
     expect(findDuplicateMatch(newItem, "CSE-2028-A", [existing])).toBe(existing);
   });
