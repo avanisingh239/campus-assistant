@@ -10,6 +10,7 @@ import { supportsEngagementToggle } from "@/lib/dashboard/category-meta";
 import { isDiscoveryWorthy, buildDiscoverFeed } from "@/lib/dashboard/discover-feed";
 import { collectClashedAnnouncementIds, type ClashAnnouncementRef } from "@/lib/dashboard/clash-flags";
 import { filterAnnouncements, type DashboardFilter } from "@/lib/dashboard/category-filter";
+import { sortByPriorityScore } from "@/lib/dashboard/priority";
 import { Card } from "./card";
 import { StatRow } from "./stat-row";
 import { CategoryFilterTabs } from "./category-filter-tabs";
@@ -49,6 +50,7 @@ interface FreeSlotRow {
  */
 export function DashboardClient({
   announcements: initialAnnouncements,
+  dismissedAnnouncements: initialDismissedAnnouncements,
   urgentIds,
   diffSummary,
   nowIso,
@@ -56,6 +58,7 @@ export function DashboardClient({
   freeSlots,
 }: {
   announcements: DashboardAnnouncement[];
+  dismissedAnnouncements: DashboardAnnouncement[];
   urgentIds: Set<string>;
   diffSummary: DiffSummary;
   nowIso: string;
@@ -64,6 +67,8 @@ export function DashboardClient({
 }) {
   const now = new Date(nowIso);
   const [announcements, setAnnouncements] = useState(initialAnnouncements);
+  const [dismissedAnnouncements, setDismissedAnnouncements] = useState(initialDismissedAnnouncements);
+  const [dismissedOpen, setDismissedOpen] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [filter, setFilter] = useState<DashboardFilter>("all");
@@ -105,16 +110,49 @@ export function DashboardClient({
     });
   }
 
+  // Real gap found in testing, right after Not-Interested items were first
+  // hidden from the main feed: there was no longer any way for a student
+  // to find one again and reverse the decision. Fixed by keeping
+  // `announcements` and `dismissedAnnouncements` as two lists an item can
+  // move between, rather than one unified list re-filtered on every
+  // render — moving it explicitly here (rather than, say, merging both
+  // into one array and re-deriving both subsets via useMemo) keeps this
+  // function the single place that decides which list an item belongs in,
+  // and lets a status change take effect immediately, with no page
+  // reload, per the task's own explicit requirement.
   async function handleStatusChange(announcementId: string, status: EngagementStatus) {
-    const previous = announcements;
-    setAnnouncements((current) =>
-      current.map((a) => (a.id === announcementId ? { ...a, engagementStatus: status } : a)),
-    );
+    const previousAnnouncements = announcements;
+    const previousDismissed = dismissedAnnouncements;
+
+    const current =
+      announcements.find((a) => a.id === announcementId) ??
+      dismissedAnnouncements.find((a) => a.id === announcementId);
+    if (!current) return;
+
+    const updated = { ...current, engagementStatus: status };
+
+    if (status === "not_interested") {
+      // Leaves the main feed (and, structurally, can never win the URGENT
+      // ribbon there anymore — urgentIds was computed server-side only over
+      // the already-filtered main list) and joins the dismissed section.
+      setAnnouncements((prev) => prev.filter((a) => a.id !== announcementId));
+      setDismissedAnnouncements((prev) => [...prev.filter((a) => a.id !== announcementId), updated]);
+    } else {
+      // Reversing the decision (Interested/Registered/none): leaves the
+      // dismissed section and re-joins the main feed immediately, resorted
+      // by the same live priority score every other card uses rather than
+      // just appended, so it lands in a sensible position without waiting
+      // for the next full page load.
+      setDismissedAnnouncements((prev) => prev.filter((a) => a.id !== announcementId));
+      setAnnouncements((prev) => sortByPriorityScore([...prev.filter((a) => a.id !== announcementId), updated], now));
+    }
+
     setActionError(null);
     try {
       await setAnnouncementStatus(announcementId, status);
     } catch (err) {
-      setAnnouncements(previous);
+      setAnnouncements(previousAnnouncements);
+      setDismissedAnnouncements(previousDismissed);
       setActionError(err instanceof Error ? err.message : "Failed to update status.");
       throw err; // Card uses this to know not to fire confetti
     }
@@ -200,6 +238,28 @@ export function DashboardClient({
                 onStatusChange={handleStatusChange}
               />
             ))}
+          </div>
+        )}
+
+        {dismissedAnnouncements.length > 0 && (
+          <div className={styles.dismissedSection}>
+            <button className={styles.dismissedToggle} onClick={() => setDismissedOpen((open) => !open)}>
+              {dismissedAnnouncements.length} item{dismissedAnnouncements.length === 1 ? "" : "s"} marked Not
+              Interested — {dismissedOpen ? "hide" : "show"}
+            </button>
+            {dismissedOpen && (
+              <div className={`${shellStyles.cards} ${styles.dismissedCards}`}>
+                {dismissedAnnouncements.map((announcement) => (
+                  <Card
+                    key={announcement.id}
+                    announcement={announcement}
+                    isUrgent={false}
+                    now={now}
+                    onStatusChange={handleStatusChange}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -40,6 +40,11 @@ export function HowThisWorks() {
             <strong>Events</strong> and <strong>opportunities</strong> are shown to everyone on the
             platform, not just your class — so you don&apos;t miss things happening elsewhere on campus.
           </p>
+          <p>
+            Marking something <strong>Not Interested</strong> removes it from your main feed so it stops
+            cluttering your priorities — but it&apos;s not gone. You can review and change your mind
+            anytime from the dismissed items section below your feed.
+          </p>
         </div>
       )}
     </div>

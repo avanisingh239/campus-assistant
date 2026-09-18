@@ -294,6 +294,34 @@
   }
 }
 
+/* ===== DISMISSED ITEMS (Not Interested) ===== */
+/* A small, unobtrusive way to find and reverse a Not Interested decision
+   now that those cards no longer appear in the main feed by default (see
+   CLAUDE.md's own "let students review and change Not Interested items"
+   fix). Deliberately visually minor — same small/underlined/muted-on-dark-
+   canvas treatment as .trustLink above, not styled to compete with "Top
+   priorities" for attention. */
+.dismissedSection {
+  margin: 6px 0 40px;
+}
+.dismissedToggle {
+  background: none;
+  border: none;
+  color: #9dc2a2;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 2px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.dismissedToggle:hover {
+  color: var(--gold);
+}
+.dismissedCards {
+  margin-top: 18px;
+}
+
 /* ===== CARD ===== */
 .card {
   background: var(--mint-card);

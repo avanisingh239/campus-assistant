@@ -37,6 +37,11 @@ export const classUpdateSchema = z
     event_date: z.string().regex(DATE_REGEX, "Pick a date."),
     start_time: z.string().regex(TIME_REGEX, "Use a 24-hour HH:MM time.").optional().or(z.literal("")),
     end_time: z.string().regex(TIME_REGEX, "Use a 24-hour HH:MM time.").optional().or(z.literal("")),
+    // Free text for what a bare status label can't say on its own — the
+    // new time a reschedule moved to, the new room a shift moved to, etc.
+    // See CLAUDE.md's own "CR form can't communicate a reschedule's real
+    // details" fix for why this exists.
+    details: z.string().max(500, "Keep details under 500 characters.").optional(),
   })
   .refine((data) => !data.start_time || !data.end_time || data.end_time > data.start_time, {
     message: "End time must be after start time.",
@@ -55,6 +60,9 @@ export const societyUpdateSchema = z
     seat_count: z.string(),
     deadline_at: z.string().optional().or(z.literal("")),
     link_url: z.string().url("Enter a valid URL.").optional().or(z.literal("")),
+    // Same free-text "details" field as classUpdateSchema, for consistency
+    // between the two forms — see CLAUDE.md's own note on why this exists.
+    details: z.string().max(500, "Keep details under 500 characters.").optional(),
   })
   .refine((data) => data.end_time > data.start_time, {
     message: "End time must be after start time.",
