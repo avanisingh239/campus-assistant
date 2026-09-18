@@ -109,25 +109,53 @@ export async function ingestRawText(
     throw new ExtractionError(`Extraction failed: ${(err as Error).message}`);
   }
 
+  // Real bug found in testing, fixed in a later pass: a single paste that
+  // extracted more than one announcement (rule 10 of the system prompt
+  // above explicitly supports this — "many forwarded messages concatenated
+  // together") used to pay for N sequential `embedText` round-trips, one
+  // per extracted item, awaited one at a time inside the loop below before
+  // this fix. Each is a genuine Gemini network call with real (not
+  // artificial/sleep-based) latency, so a paste extracting several
+  // announcements could take many times longer than one extracting a
+  // single announcement — a real, reported ~30s regression, even though
+  // neither lib/ingestion/throttle.ts's batch spacing (correctly a no-op
+  // for a batch of 1 — see that file) nor embedText itself (no retry/
+  // backoff loop of its own — see lib/ai/embed.ts) has any coded delay.
+  // Fixed by computing every item's title embedding CONCURRENTLY
+  // (Promise.all) up front, rather than sequentially inside the per-item
+  // loop — this is safe because embedText is a pure, side-effect-free
+  // lookup with no ordering dependency on anything else, so parallelizing
+  // it changes nothing about correctness or the still-sequential
+  // dedup/insert loop that follows (which does have real ordering
+  // dependencies — an item can dedupe against one inserted earlier in the
+  // same batch). Doesn't change the total number of Gemini calls made
+  // (still exactly one per extracted item, same rate-limit cost as
+  // before) or this app's real RPM ceiling exposure — a rate limiter
+  // counts requests within a window, not concurrency, so N calls fired at
+  // once count the same toward that ceiling as N calls spread out over
+  // time; it only collapses N sequential real round-trips down to the
+  // time of the single slowest one.
+  const titleEmbeddings = await Promise.all(extracted.map((item) => embedText(item.title)));
+
   // 3. One announcement + one announcement_sources link per extracted item —
   //    unless it's a likely duplicate of an already-existing announcement
   //    (lib/deduplication/sync.ts), in which case the new message is
   //    linked to that existing row instead of creating a second one.
   const announcementIds: string[] = [];
   const announcements: IngestedAnnouncementSummary[] = [];
-  for (const item of extracted) {
+  for (let i = 0; i < extracted.length; i++) {
+    const item = extracted[i];
     // Real ML upgrade to dedup's title-matching (see lib/deduplication/
-    // match.ts's own doc comment for the full reasoning): one embedding
-    // call per extracted item, computed BEFORE the dedup check since that
-    // check needs it — never re-embedding an existing candidate, which
-    // already has its own `title_embedding` stored from when IT was
-    // created. `embedText` (lib/ai/embed.ts — also the "Ask Rescript"
-    // feature's second caller, see that file's own doc comment) never
-    // throws — a failed/rate-limited call logs and resolves to `null`,
-    // which the dedup matcher already treats as "fall back to the exact
-    // linked_class_name path only for this item," never as a reason to
-    // fail the whole ingestion.
-    const titleEmbedding = await embedText(item.title);
+    // match.ts's own doc comment for the full reasoning) — never
+    // re-embedding an existing candidate, which already has its own
+    // `title_embedding` stored from when IT was created. `embedText`
+    // (lib/ai/embed.ts — also the "Ask Rescript" feature's second caller,
+    // see that file's own doc comment) never throws — a failed/
+    // rate-limited call logs and resolves to `null`, which the dedup
+    // matcher already treats as "fall back to the exact linked_class_name
+    // path only for this item," never as a reason to fail the whole
+    // ingestion.
+    const titleEmbedding = titleEmbeddings[i];
     const row = { ...toAnnouncementRow(item, trimmed), title_embedding: titleEmbedding };
 
     const dedupResult = await findAndMergeDuplicate(
