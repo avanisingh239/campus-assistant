@@ -218,15 +218,6 @@ export function TimetableScreen({
               <Button className={styles.actionButton} onClick={openAddForm}>
                 + Add a class
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className={styles.actionButton}
-                disabled
-                title="Upload parsing isn't built yet — add classes manually for now."
-              >
-                Upload image (coming soon)
-              </Button>
             </div>
             <div className={styles.grid}>
               {columns.map((column) => (

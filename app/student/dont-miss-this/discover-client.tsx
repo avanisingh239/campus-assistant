@@ -10,6 +10,7 @@ import { AppHeader } from "../app-header";
 import { TabRow } from "../tab-row";
 import { Card } from "../dashboard/card";
 import shellStyles from "../shell.module.css";
+import styles from "./discover.module.css";
 
 /**
  * Client Component for the "Don't Miss This" discovery feed — same
@@ -63,6 +64,11 @@ export function DiscoverClient({
         <p className={shellStyles.sectionLabel}>
           <StarIcon />
           Don&apos;t miss these
+        </p>
+
+        <p className={styles.pageNote}>
+          Limited-seat opportunities and events that matter, shown here regardless of urgency, so they
+          don&apos;t get buried under your more time-sensitive deadlines.
         </p>
 
         {announcements.length === 0 ? (

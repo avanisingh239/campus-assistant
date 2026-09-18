@@ -1,0 +1,15 @@
+/*
+ * Same "#ddf0df secondary text on dark canvas" .pageNote convention as
+ * ../communities/communities.module.css and ../timetable/timetable.module.css
+ * — each real screen owns its own near-identical copy of this rule rather
+ * than importing one across a route boundary (see CLAUDE.md's §Public
+ * landing page note on why this codebase repeats this specific pattern
+ * per-screen instead of sharing it).
+ */
+.pageNote {
+  font-size: 13px;
+  color: #ddf0df;
+  line-height: 1.5;
+  margin: -8px 0 20px;
+  max-width: 560px;
+}

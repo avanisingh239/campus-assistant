@@ -11,6 +11,7 @@ import {
 } from "@/lib/admin/validation";
 import { TextField } from "@/components/ui/text-field";
 import { Button } from "@/components/ui/button";
+import uiStyles from "@/components/ui.module.css";
 import styles from "./admin-dashboard.module.css";
 
 interface FormState {
@@ -20,6 +21,7 @@ interface FormState {
   event_date: string;
   start_time: string;
   end_time: string;
+  details: string;
 }
 
 const EMPTY: FormState = {
@@ -29,6 +31,7 @@ const EMPTY: FormState = {
   event_date: "",
   start_time: "",
   end_time: "",
+  details: "",
 };
 
 /**
@@ -110,6 +113,21 @@ export function ClassUpdateForm({
             </label>
           ))}
         </fieldset>
+
+        <label className={uiStyles.field} htmlFor="details">
+          <span className={`${uiStyles.fieldLabel} ${styles.fieldLabel}`}>
+            Details (optional) — the new time, new room, or anything else a status label alone can&apos;t say
+          </span>
+          <textarea
+            id="details"
+            className={uiStyles.fieldInput}
+            value={form.details}
+            onChange={(e) => update("details", e.target.value)}
+            placeholder="e.g. Moved to Room 204, Thursday 3–4pm"
+            rows={3}
+          />
+          {fieldErrors.details && <p className={uiStyles.fieldError}>{fieldErrors.details}</p>}
+        </label>
 
         <TextField
           id="event_date"

@@ -60,6 +60,26 @@ describe("buildClassUpdateDraft", () => {
     expect(draft.end_time).toBeNull();
     expect(draft.raw_text).toContain("Time: not specified");
   });
+
+  it("flows the admin's Details text into why_it_matters and raw_text", () => {
+    const draft = buildClassUpdateDraft(
+      classInput({ status: "rescheduled", details: "Moved to Room 204, Thursday 3-4pm" }),
+      "CSE-2028-A",
+    );
+    expect(draft.why_it_matters).toBe("Moved to Room 204, Thursday 3-4pm");
+    expect(draft.raw_text).toContain("Details: Moved to Room 204, Thursday 3-4pm");
+  });
+
+  it("does not fabricate details when left blank", () => {
+    const draft = buildClassUpdateDraft(classInput({ details: undefined }), "CSE-2028-A");
+    expect(draft.why_it_matters).toBeNull();
+    expect(draft.raw_text).toContain("Details: none given");
+  });
+
+  it("trims whitespace-only details down to null", () => {
+    const draft = buildClassUpdateDraft(classInput({ details: "   " }), "CSE-2028-A");
+    expect(draft.why_it_matters).toBeNull();
+  });
 });
 
 describe("buildSocietyUpdateDraft", () => {
@@ -95,5 +115,20 @@ describe("buildSocietyUpdateDraft", () => {
     expect(draft.link_url).toBeNull();
     expect(draft.raw_text).toContain("Registration deadline: none given");
     expect(draft.raw_text).toContain("Registration link: none given");
+  });
+
+  it("flows the admin's Details text into why_it_matters and raw_text", () => {
+    const draft = buildSocietyUpdateDraft(
+      societyInput({ details: "Held in the main auditorium, bring your student ID" }),
+      "Robotics Club",
+    );
+    expect(draft.why_it_matters).toBe("Held in the main auditorium, bring your student ID");
+    expect(draft.raw_text).toContain("Details: Held in the main auditorium, bring your student ID");
+  });
+
+  it("does not fabricate details when left blank", () => {
+    const draft = buildSocietyUpdateDraft(societyInput({ details: undefined }), "Robotics Club");
+    expect(draft.why_it_matters).toBeNull();
+    expect(draft.raw_text).toContain("Details: none given");
   });
 });

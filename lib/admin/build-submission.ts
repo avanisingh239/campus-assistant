@@ -23,11 +23,28 @@ export interface ClassAnnouncementDraft {
   start_time: string | null;
   end_time: string | null;
   linked_class_name: string;
+  /**
+   * The admin's own free-text "Details" field, straight into
+   * `announcements.why_it_matters` — a bare status label like
+   * "Rescheduled" or "Room shift" says nothing about *when* the class
+   * moved to or *which* room it moved to, so this is where that actually
+   * lands on the student-facing card (card.tsx already renders
+   * `why_it_matters` conditionally, so an admin who leaves this blank
+   * gets exactly the old behavior back). Not fabricated when blank —
+   * `null`, not an empty string, same "don't invent placeholder content"
+   * rule as every other optional field in this file.
+   */
+  why_it_matters: string | null;
 }
 
 function formatTimeLine(startTime: string | undefined, endTime: string | undefined): string {
   if (!startTime || !endTime) return "Time: not specified";
   return `Time: ${startTime}–${endTime}`;
+}
+
+function formatDetailsLine(details: string | undefined): string {
+  const trimmed = details?.trim();
+  return trimmed ? `Details: ${trimmed}` : "Details: none given";
 }
 
 export function buildClassUpdateDraft(
@@ -36,6 +53,7 @@ export function buildClassUpdateDraft(
 ): ClassAnnouncementDraft {
   const statusLabel = CLASS_UPDATE_STATUS_LABELS[input.status];
   const title = `${input.course_name} (Section ${input.section}) — ${statusLabel}`;
+  const details = input.details?.trim() || null;
 
   const raw_text = [
     "Class update — submitted via Admin Dashboard",
@@ -45,6 +63,7 @@ export function buildClassUpdateDraft(
     `Status: ${statusLabel}`,
     `Date: ${input.event_date}`,
     formatTimeLine(input.start_time, input.end_time),
+    formatDetailsLine(input.details),
   ].join("\n");
 
   return {
@@ -54,6 +73,7 @@ export function buildClassUpdateDraft(
     start_time: input.start_time || null,
     end_time: input.end_time || null,
     linked_class_name: input.course_name,
+    why_it_matters: details,
   };
 }
 
@@ -75,6 +95,8 @@ export interface SocietyAnnouncementDraft {
    */
   deadline_at: string | null;
   link_url: string | null;
+  /** Same "Details" field/why_it_matters wiring as ClassAnnouncementDraft above. */
+  why_it_matters: string | null;
 }
 
 export function buildSocietyUpdateDraft(
@@ -86,6 +108,7 @@ export function buildSocietyUpdateDraft(
     ? `Registration deadline: ${input.deadline_at.replace("T", " ")}`
     : "Registration deadline: none given";
   const linkLine = input.link_url ? `Registration link: ${input.link_url}` : "Registration link: none given";
+  const details = input.details?.trim() || null;
 
   const raw_text = [
     "Society update — submitted via Admin Dashboard",
@@ -96,6 +119,7 @@ export function buildSocietyUpdateDraft(
     seatsLine,
     deadlineLine,
     linkLine,
+    formatDetailsLine(input.details),
   ].join("\n");
 
   return {
@@ -107,5 +131,6 @@ export function buildSocietyUpdateDraft(
     seat_count: input.unlimited_seats ? null : Number(input.seat_count),
     deadline_at: input.deadline_at ? `${input.deadline_at}:00Z` : null,
     link_url: input.link_url || null,
+    why_it_matters: details,
   };
 }

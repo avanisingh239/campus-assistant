@@ -9,6 +9,7 @@ import {
 } from "@/lib/admin/validation";
 import { TextField } from "@/components/ui/text-field";
 import { Button } from "@/components/ui/button";
+import uiStyles from "@/components/ui.module.css";
 import styles from "./admin-dashboard.module.css";
 
 interface FormState {
@@ -20,6 +21,7 @@ interface FormState {
   seat_count: string;
   deadline_at: string;
   link_url: string;
+  details: string;
 }
 
 const EMPTY: FormState = {
@@ -31,6 +33,7 @@ const EMPTY: FormState = {
   seat_count: "",
   deadline_at: "",
   link_url: "",
+  details: "",
 };
 
 /**
@@ -87,6 +90,21 @@ export function SocietyUpdateForm({
           error={fieldErrors.title}
           labelClassName={styles.fieldLabel}
         />
+
+        <label className={uiStyles.field} htmlFor="details">
+          <span className={`${uiStyles.fieldLabel} ${styles.fieldLabel}`}>
+            Details (optional) — venue, what changed, or anything else worth telling students
+          </span>
+          <textarea
+            id="details"
+            className={uiStyles.fieldInput}
+            value={form.details}
+            onChange={(e) => update("details", e.target.value)}
+            placeholder="e.g. Held in the main auditorium, bring your student ID"
+            rows={3}
+          />
+          {fieldErrors.details && <p className={uiStyles.fieldError}>{fieldErrors.details}</p>}
+        </label>
 
         <TextField
           id="event_date"

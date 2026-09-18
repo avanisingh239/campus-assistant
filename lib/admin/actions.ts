@@ -98,7 +98,7 @@ export async function submitClassUpdate(
     .insert({
       category: "cancellation",
       title: draft.title,
-      why_it_matters: null,
+      why_it_matters: draft.why_it_matters,
       what_to_do_next: null,
       confidence: "clear",
       confidence_note: null,
@@ -183,7 +183,7 @@ export async function submitSocietyUpdate(
     .insert({
       category: "event",
       title: draft.title,
-      why_it_matters: null,
+      why_it_matters: draft.why_it_matters,
       what_to_do_next: null,
       confidence: "clear",
       confidence_note: null,
