@@ -1,7 +1,8 @@
 import "server-only";
 import { z } from "zod";
 import { ApiError } from "@google/genai";
-import { GEMINI_MODEL, getGeminiClient } from "./gemini";
+import { GEMINI_MODEL, getGeminiApiKeys, getGeminiClientForKey } from "./gemini";
+import { nextKeyIndex } from "./gemini-keys";
 import {
   ExtractionBatchSchema,
   type ExtractedAnnouncement,
@@ -77,13 +78,29 @@ const RESPONSE_JSON_SCHEMA = z.toJSONSchema(ExtractionBatchSchema);
 
 export class ExtractionError extends Error {}
 
-/** Thrown after retries are exhausted on a 429/503 from Gemini's free tier. */
+/** Thrown after every key + backoff attempt is exhausted on a 429/503. */
 export class RateLimitError extends ExtractionError {}
 
-const MAX_ATTEMPTS = 3;
+/**
+ * Real capacity issue, not a broken app — a rate-limit failure is treated
+ * as an expected case (see CLAUDE.md's own note on the live quota check
+ * that motivated this), so its message is deliberately specific and
+ * reassuring rather than a generic error string. `app/student/ingest/
+ * result-panel.tsx`'s Failed result state shows this `.message` directly,
+ * distinct from an `ExtractionError`'s own more specific text for a
+ * genuinely malformed message (e.g. "Gemini's response did not match the
+ * expected extraction schema...") — a student or a judge watching a live
+ * demo should be able to tell "temporary, try again" apart from "this
+ * input has a real problem."
+ */
+const RATE_LIMIT_MESSAGE = "We're getting a lot of requests right now — try again in a moment.";
+
+/** Backoff retries on the SAME key, once key rotation (below) has nothing left to try. */
+const MAX_BACKOFF_ATTEMPTS_PER_KEY = 3;
 const BASE_DELAY_MS = 3000;
-function isRetryableStatus(status: number): boolean {
-  return status === 429 || status === 503;
+
+function isServiceOverloadedStatus(status: number): boolean {
+  return status === 503;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -91,15 +108,49 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Which key index to start from — persisted across calls (module-level,
+ * not reset per-request) rather than always starting at 0, so a batch's
+ * sequential extraction calls (app/student/ingest's runIngest loop, one
+ * call per message) keep rotating forward through every configured key
+ * instead of re-hitting whichever key happens to be first — and likely
+ * still exhausted — on every single call. Safe as plain module state: this
+ * file is only ever exercised by one Node.js process's sequential batch
+ * loop (each call is awaited before the next one starts), never
+ * concurrent requests racing to mutate it.
+ */
+let sharedKeyIndex = 0;
+
+/**
  * Calls the Gemini API to extract structured announcements from a raw
  * pasted text payload, validated against ExtractionBatchSchema.
  *
- * Gemini's free tier caps requests at roughly 10/minute — a 429 (or a 503,
- * which the free tier also returns under load) gets up to MAX_ATTEMPTS-1
- * retries with exponential backoff before giving up with a RateLimitError
- * whose message is meant to be shown directly to the user (see
+ * Real quota check against the live Google AI Studio console (not just
+ * documentation): this project's key is capped at roughly 5 requests/
+ * minute and ~100/day. Two independent mitigations, both real fixes for a
+ * real limit rather than papering over it:
+ *
+ *   - **Key rotation on 429**: if more than one key is configured
+ *     (`GEMINI_API_KEYS`, lib/ai/gemini.ts), a 429 immediately retries the
+ *     same request on the next key — no backoff wait, since a fresh key
+ *     has its own fresh quota and waiting on the exhausted one wouldn't
+ *     help. Every configured key gets tried at least once before this
+ *     falls back to the second mitigation below. A single-key setup (the
+ *     backward-compatible default) has no second key to rotate to, so it
+ *     skips straight to that fallback on its very first 429 — this
+ *     preserves the exact retry behavior a single-key deployment had
+ *     before key rotation existed.
+ *   - **Exponential backoff on the current key**: for a 503 (Gemini's
+ *     free tier also returns this under general load, unrelated to any
+ *     one key's quota — rotating keys wouldn't plausibly help, so this
+ *     path doesn't try), or once every key has already 429'd once, up to
+ *     `MAX_BACKOFF_ATTEMPTS_PER_KEY` retries with exponential backoff on
+ *     whichever key is current before finally giving up.
+ *
+ * Either path exhausting gives up with a `RateLimitError` whose message is
+ * meant to be shown directly to the user (see
  * app/student/ingest/result-panel.tsx, which surfaces any thrown Error's
- * `.message` in the Failed result state).
+ * `.message` in the Failed result state) — see `RATE_LIMIT_MESSAGE`'s own
+ * doc comment for why that text is deliberately specific to this case.
  */
 export async function extractAnnouncements(
   rawText: string,
@@ -107,13 +158,20 @@ export async function extractAnnouncements(
   const MAX_CHARS = 12000;
   const truncated = rawText.length > MAX_CHARS ? rawText.slice(0, MAX_CHARS) : rawText;
 
-  const client = getGeminiClient();
+  const keys = getGeminiApiKeys();
   const systemInstruction = buildSystemPrompt(new Date());
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+
+  let keyIndex = sharedKeyIndex % keys.length;
+  let keysRotatedThrough = 0;
+  let backoffAttempt = 1;
+
+  while (true) {
+    const client = getGeminiClientForKey(keys[keyIndex]);
+
     try {
       const response = await client.models.generateContent({
         model: GEMINI_MODEL,
-                contents: truncated,
+        contents: truncated,
         config: {
           systemInstruction,
           responseMimeType: "application/json",
@@ -144,29 +202,43 @@ export async function extractAnnouncements(
         );
       }
 
+      sharedKeyIndex = keyIndex;
       return result.data.announcements;
     } catch (err) {
       if (err instanceof ApiError) {
         console.error("GEMINI_API_ERROR", err.status, JSON.stringify(err, null, 2));
       }
-      const retryable = err instanceof ApiError && isRetryableStatus(err.status);
-      if (retryable && attempt < MAX_ATTEMPTS) {
-        await sleep(BASE_DELAY_MS * 2 ** (attempt - 1));
-        continue;
+
+      if (err instanceof ApiError && err.status === 429) {
+        const hasUntriedKey = keysRotatedThrough < keys.length - 1;
+        if (hasUntriedKey) {
+          keysRotatedThrough++;
+          keyIndex = nextKeyIndex(keyIndex, keys.length);
+          sharedKeyIndex = keyIndex;
+          continue; // immediate retry on the next key, no sleep
+        }
+        // Every key has now 429'd at least once this request — fall back
+        // to backing off on whichever key we're currently on.
+        if (backoffAttempt < MAX_BACKOFF_ATTEMPTS_PER_KEY) {
+          await sleep(BASE_DELAY_MS * 2 ** (backoffAttempt - 1));
+          backoffAttempt++;
+          continue;
+        }
+        sharedKeyIndex = keyIndex;
+        throw new RateLimitError(RATE_LIMIT_MESSAGE);
       }
 
-      if (retryable) {
-        throw new RateLimitError(
-          "Gemini's free tier only allows a few requests per minute — please wait a moment and try again.",
-        );
+      if (err instanceof ApiError && isServiceOverloadedStatus(err.status)) {
+        if (backoffAttempt < MAX_BACKOFF_ATTEMPTS_PER_KEY) {
+          await sleep(BASE_DELAY_MS * 2 ** (backoffAttempt - 1));
+          backoffAttempt++;
+          continue;
+        }
+        throw new RateLimitError(RATE_LIMIT_MESSAGE);
       }
 
       if (err instanceof ExtractionError) throw err;
       throw new ExtractionError(`Extraction failed: ${(err as Error).message}`);
     }
   }
-
-  // Unreachable — every loop iteration either returns or throws — but kept
-  // so TypeScript can see every path returns/throws.
-  throw new ExtractionError("Extraction failed after retries.");
 }

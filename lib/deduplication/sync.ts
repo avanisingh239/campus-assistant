@@ -31,6 +31,7 @@ interface CandidateRow {
   deadline_at: string | null;
   linked_class_name: string | null;
   seat_count: number | null;
+  title_embedding: number[] | null;
 }
 
 /**
@@ -180,7 +181,7 @@ export async function findAndMergeDuplicate(
   const { data: rawCandidates, error: candidatesError } = await supabase
     .from("announcements")
     .select(
-      "id, category, title, event_date, start_time, end_time, deadline_at, linked_class_name, seat_count",
+      "id, category, title, event_date, start_time, end_time, deadline_at, linked_class_name, seat_count, title_embedding",
     )
     .eq("category", newItem.category)
     .gte("created_at", sinceIso);

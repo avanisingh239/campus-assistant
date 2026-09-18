@@ -3,7 +3,7 @@ import {
   CONSEQUENCE_WEIGHTS,
   computePriorityScore,
   computeUrgencyScore,
-  pickUrgentAnnouncementId,
+  pickUrgentAnnouncementIds,
   sortByPriorityScore,
 } from "./priority";
 import type { DashboardAnnouncement } from "./types";
@@ -201,32 +201,32 @@ describe("sortByPriorityScore", () => {
   });
 });
 
-describe("pickUrgentAnnouncementId", () => {
-  it("picks the highest-scoring eligible announcement", () => {
+describe("pickUrgentAnnouncementIds", () => {
+  it("picks the highest-scoring eligible announcement when only one qualifies", () => {
     const low = announcement({ id: "low", priority_score: 999, deadline_at: "2026-10-25T00:00:00Z" });
     const high = announcement({ id: "high", deadline_at: "2026-09-15T00:00:00Z" });
-    expect(pickUrgentAnnouncementId([low, high], NOW)).toBe("high");
+    expect(pickUrgentAnnouncementIds([low, high], NOW)).toEqual(new Set(["high"]));
   });
 
   it("ignores categories where urgency isn't meaningful, regardless of stored priority_score", () => {
     const fyi = announcement({ id: "fyi", category: "fyi", priority_score: 999, deadline_at: NOW.toISOString() });
     const link = announcement({ id: "link", category: "society_link", priority_score: 999 });
-    expect(pickUrgentAnnouncementId([fyi, link], NOW)).toBeNull();
+    expect(pickUrgentAnnouncementIds([fyi, link], NOW).size).toBe(0);
   });
 
-  it("returns null when nothing eligible clears the urgency threshold", () => {
+  it("returns an empty set when nothing eligible clears the urgency threshold", () => {
     const farOff = announcement({ id: "far", category: "deadline", deadline_at: "2026-12-31T00:00:00Z" });
     const noDate = announcement({ id: "none", category: "opportunity", event_date: null });
-    expect(pickUrgentAnnouncementId([farOff, noDate], NOW)).toBeNull();
+    expect(pickUrgentAnnouncementIds([farOff, noDate], NOW).size).toBe(0);
   });
 
-  it("returns null for an empty list", () => {
-    expect(pickUrgentAnnouncementId([], NOW)).toBeNull();
+  it("returns an empty set for an empty list", () => {
+    expect(pickUrgentAnnouncementIds([], NOW).size).toBe(0);
   });
 
   it("does not treat a past deadline as urgent", () => {
     const past = announcement({ id: "past", deadline_at: "2026-01-01T00:00:00Z" });
-    expect(pickUrgentAnnouncementId([past], NOW)).toBeNull();
+    expect(pickUrgentAnnouncementIds([past], NOW).size).toBe(0);
   });
 
   it("a near-term event can outrank a far-off deadline for the ribbon", () => {
@@ -241,7 +241,7 @@ describe("pickUrgentAnnouncementId", () => {
       category: "deadline",
       deadline_at: "2026-10-20T00:00:00Z",
     });
-    expect(pickUrgentAnnouncementId([nearEvent, farDeadline], NOW)).toBe("near-event");
+    expect(pickUrgentAnnouncementIds([nearEvent, farDeadline], NOW)).toEqual(new Set(["near-event"]));
   });
 
   it("real bug: an opportunity closing today wins the ribbon over a registered_update happening in several days", () => {
@@ -256,8 +256,53 @@ describe("pickUrgentAnnouncementId", () => {
       category: "registered_update",
       deadline_at: "2026-09-18T12:00:00Z", // 4 days out
     });
-    expect(pickUrgentAnnouncementId([opportunityClosingToday, registeredUpdateInDays], NOW)).toBe(
+    // Both qualify independently here — this isn't the "only one wins"
+    // case, it's confirming the far-off item's lower score still clears
+    // the threshold on its own (see the multi-item test below for the
+    // real bug this file was actually missing coverage for: BOTH showing
+    // up in the set at once, not one crowding out the other).
+    expect(pickUrgentAnnouncementIds([opportunityClosingToday, registeredUpdateInDays], NOW).has(
       "opportunity-today",
+    )).toBe(true);
+  });
+
+  it("real bug fix: multiple same-day items all get flagged at once, not just the single highest-scoring one", () => {
+    // Before this fix, pickUrgentAnnouncementId tracked only a single
+    // best/bestScore pair and could only ever return one id — even though
+    // the near-term floor means several genuinely urgent items can score
+    // almost identically (~92.9-100) on the same day. Three eligible
+    // categories, all due within a few hours of each other and of NOW,
+    // should ALL be flagged urgent, not just whichever happens to score
+    // highest.
+    const deadlineToday = announcement({
+      id: "deadline-today",
+      category: "deadline",
+      deadline_at: "2026-09-14T18:00:00Z", // 6h out
+    });
+    const cancellationToday = announcement({
+      id: "cancellation-today",
+      category: "cancellation",
+      event_date: "2026-09-14",
+      start_time: "20:00", // 8h out
+    });
+    const opportunityToday = announcement({
+      id: "opportunity-today",
+      category: "opportunity",
+      event_date: "2026-09-15",
+      start_time: "00:00", // 12h out
+    });
+    const farOffDeadline = announcement({
+      id: "far-off",
+      category: "deadline",
+      deadline_at: "2026-12-31T00:00:00Z",
+    });
+
+    const urgentIds = pickUrgentAnnouncementIds(
+      [deadlineToday, cancellationToday, opportunityToday, farOffDeadline],
+      NOW,
     );
+
+    expect(urgentIds).toEqual(new Set(["deadline-today", "cancellation-today", "opportunity-today"]));
+    expect(urgentIds.has("far-off")).toBe(false);
   });
 });

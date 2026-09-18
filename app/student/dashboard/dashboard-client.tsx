@@ -49,14 +49,14 @@ interface FreeSlotRow {
  */
 export function DashboardClient({
   announcements: initialAnnouncements,
-  urgentId,
+  urgentIds,
   diffSummary,
   nowIso,
   clashes,
   freeSlots,
 }: {
   announcements: DashboardAnnouncement[];
-  urgentId: string | null;
+  urgentIds: Set<string>;
   diffSummary: DiffSummary;
   nowIso: string;
   clashes: ClashAnnouncementRef[];
@@ -195,7 +195,7 @@ export function DashboardClient({
               <Card
                 key={announcement.id}
                 announcement={announcement}
-                isUrgent={announcement.id === urgentId}
+                isUrgent={urgentIds.has(announcement.id)}
                 now={now}
                 onStatusChange={handleStatusChange}
               />

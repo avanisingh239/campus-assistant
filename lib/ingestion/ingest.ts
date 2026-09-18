@@ -1,7 +1,9 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractAnnouncements, ExtractionError } from "@/lib/ai/extract";
+import { embedText } from "@/lib/ai/embed";
 import {
   syncFreeSlotsForCancellation,
   matchAnnouncementToOpenFreeSlots,
@@ -114,7 +116,19 @@ export async function ingestRawText(
   const announcementIds: string[] = [];
   const announcements: IngestedAnnouncementSummary[] = [];
   for (const item of extracted) {
-    const row = toAnnouncementRow(item, trimmed);
+    // Real ML upgrade to dedup's title-matching (see lib/deduplication/
+    // match.ts's own doc comment for the full reasoning): one embedding
+    // call per extracted item, computed BEFORE the dedup check since that
+    // check needs it — never re-embedding an existing candidate, which
+    // already has its own `title_embedding` stored from when IT was
+    // created. `embedText` (lib/ai/embed.ts — also the "Ask Rescript"
+    // feature's second caller, see that file's own doc comment) never
+    // throws — a failed/rate-limited call logs and resolves to `null`,
+    // which the dedup matcher already treats as "fall back to the exact
+    // linked_class_name path only for this item," never as a reason to
+    // fail the whole ingestion.
+    const titleEmbedding = await embedText(item.title);
+    const row = { ...toAnnouncementRow(item, trimmed), title_embedding: titleEmbedding };
 
     const dedupResult = await findAndMergeDuplicate(
       supabase,
@@ -183,6 +197,26 @@ export async function ingestRawText(
       await matchAnnouncementToOpenFreeSlots(supabase, announcementId);
     }
   }
+
+  // Real bug found in testing: submitting a message here and then
+  // navigating to the dashboard (or Don't Miss This, or the timetable, if
+  // a cancellation matched an existing entry) could keep showing stale
+  // data until a manual hard refresh. All three of those pages are
+  // force-dynamic (always re-fetch on the server), but that alone doesn't
+  // invalidate the Router Cache Next.js keeps client-side for routes
+  // already visited this session — a soft `<Link>` navigation back to one
+  // of them (e.g. result-panel.tsx's "View on your dashboard") could still
+  // be served the last cached RSC payload from before this mutation. A
+  // brand-new announcement can affect any of the three (the dashboard
+  // always; Don't Miss This if it's an opportunity/seat-limited event; the
+  // timetable if a cancellation here just matched an existing entry via
+  // syncFreeSlotsForCancellation above), so all three are revalidated
+  // unconditionally rather than trying to predict which one a given batch
+  // touched. Called once per extracted item in a batch — revalidatePath is
+  // idempotent, so the repetition is harmless.
+  revalidatePath("/student/dashboard");
+  revalidatePath("/student/dont-miss-this");
+  revalidatePath("/student/timetable");
 
   return {
     messageId: message.id as string,

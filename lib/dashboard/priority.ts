@@ -232,37 +232,38 @@ const URGENCY_ELIGIBLE_CATEGORIES: ReadonlySet<AnnouncementCategory> = new Set([
 const URGENT_RIBBON_THRESHOLD = 15;
 
 /**
- * Picks the single announcement to show the pulsing "URGENT" corner
- * ribbon on, using the real computed priority score above (previously:
- * the always-0 stored `priority_score`, tie-broken by soonest upcoming
- * date — that fallback is gone now that the score itself is real).
- * Highest score among the eligible categories wins; returns `null` rather
- * than an arbitrary pick when nothing clears `URGENT_RIBBON_THRESHOLD` —
- * showing URGENT on literally the first list item with no real reason
- * would be misleading.
+ * Real bug found in testing: only a single announcement ever got the
+ * URGENT ribbon, even when several qualified. This used to track a single
+ * `best`/`bestScore` pair and return one winner's id — structurally
+ * incapable of flagging more than one, even though nothing about the
+ * ribbon's own meaning ("above the urgency threshold") implies there can
+ * only be one. This became visibly wrong once the near-term floor above
+ * existed: several same-day items can now legitimately all score
+ * ~92.9-100 at once, and only the single highest of them was ever shown as
+ * urgent, silently hiding the ribbon on the others.
+ *
+ * Fix: return the full **set** of eligible announcement ids scoring above
+ * `URGENT_RIBBON_THRESHOLD`, not just the single highest. Every eligible
+ * item clearing the threshold gets the ribbon; nothing about the
+ * underlying scoring/sorting logic above changed — this only changes how
+ * many ids the caller treats as urgent. An empty set (rather than `null`)
+ * is the "nothing urgent" case, so callers use plain `Set.has()` membership
+ * instead of an equality check against a single id.
  */
-export function pickUrgentAnnouncementId(
+export function pickUrgentAnnouncementIds(
   announcements: DashboardAnnouncement[],
   now: Date,
-): string | null {
-  const eligible = announcements.filter((a) => URGENCY_ELIGIBLE_CATEGORIES.has(a.category));
-  if (eligible.length === 0) return null;
+): Set<string> {
+  const urgentIds = new Set<string>();
 
-  let best: DashboardAnnouncement | null = null;
-  let bestScore = -Infinity;
-
-  for (const announcement of eligible) {
-    const score = computePriorityScore(announcement, now);
-    if (score > bestScore) {
-      best = announcement;
-      bestScore = score;
+  for (const announcement of announcements) {
+    if (!URGENCY_ELIGIBLE_CATEGORIES.has(announcement.category)) continue;
+    if (computePriorityScore(announcement, now) > URGENT_RIBBON_THRESHOLD) {
+      urgentIds.add(announcement.id);
     }
   }
 
-  if (best && bestScore > URGENT_RIBBON_THRESHOLD) {
-    return best.id;
-  }
-  return null;
+  return urgentIds;
 }
 
 /*

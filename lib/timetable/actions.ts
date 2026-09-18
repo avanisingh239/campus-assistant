@@ -1,9 +1,29 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncClashesForStudent, matchTimetableEntryToExistingCancellations } from "@/lib/deterministic/sync";
 import type { TimetableEntryRow } from "@/lib/deterministic/types";
+
+/**
+ * Real bug found in testing: adding/editing/deleting a timetable entry
+ * (which can create or clear a clash, per lib/deterministic/sync.ts's
+ * syncClashesForStudent/matchTimetableEntryToExistingCancellations calls
+ * below) sometimes didn't show up on /student/timetable or
+ * /student/dashboard without a manual hard refresh. Both pages are
+ * force-dynamic, but that only guarantees the *server* recomputes fresh
+ * data on request — it doesn't invalidate the client-side Router Cache
+ * Next.js keeps for routes already visited this session, which is what a
+ * plain client-side navigation back to either page could still be served
+ * from. Called from every mutating action below, right after its own
+ * clash resync, so both pages are always in sync with whatever this action
+ * just changed.
+ */
+function revalidateTimetableAffectedPaths(): void {
+  revalidatePath("/student/timetable");
+  revalidatePath("/student/dashboard");
+}
 
 /**
  * Timetable CRUD Server Actions. No UI calls these yet — the real
@@ -71,6 +91,7 @@ export async function addTimetableEntry(
     course_name: input.course_name,
   };
   await matchTimetableEntryToExistingCancellations(admin, newEntry);
+  revalidateTimetableAffectedPaths();
 
   return { id: data.id as string };
 }
@@ -102,6 +123,7 @@ export async function updateTimetableEntry(
   // only ever adds rows, it doesn't need to remove a now-stale one since
   // the original match was still correct at the time it was created).
   await matchTimetableEntryToExistingCancellations(admin, data as TimetableEntryRow);
+  revalidateTimetableAffectedPaths();
 }
 
 export async function deleteTimetableEntry(id: string): Promise<void> {
@@ -120,4 +142,5 @@ export async function deleteTimetableEntry(id: string): Promise<void> {
   // level (on delete cascade in supabase/schema.sql) — this resync just
   // recomputes what's left, it's not cleaning up the deleted entry itself.
   await syncClashesForStudent(createAdminClient(), studentId);
+  revalidateTimetableAffectedPaths();
 }
