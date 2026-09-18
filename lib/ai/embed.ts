@@ -19,6 +19,43 @@ import { getGeminiApiKeys, getGeminiClientForKey } from "./gemini";
 export const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
 
 /**
+ * Real regression found in testing, right after the sibling fix that
+ * parallelized embedding calls across extracted items (CLAUDE.md's own
+ * "single paste extracting several announcements" note): that fix only
+ * helps when a paste extracts MORE THAN ONE item — for a single-item
+ * paste, or the slowest call in a parallelized batch, there was still no
+ * ceiling at all on how long one `embedContent` call could take, and a
+ * live report showed a single paste taking ~13s post-fix against a usual
+ * ~5s, meaning one embedding call alone was eating several extra seconds
+ * of genuine (not artificial) API latency with nothing capping it.
+ *
+ * This function's own doc comment already establishes the governing
+ * principle for a FAILED embedding call: it must never block ingestion,
+ * because a cheaper, safe fallback (exact `linked_class_name` matching
+ * only) already exists. A SLOW-but-eventually-successful call is the same
+ * risk in a different shape — "chasing a signal that already has a
+ * cheaper fallback, at the cost of the user's time" — so it gets the same
+ * treatment: `embedText` races the real call against this timeout and
+ * treats a timeout exactly like any other failure (log, return `null`,
+ * let dedup fall back gracefully). 5s is a deliberate, documented,
+ * revisitable starting point, not a derived value (same honest caveat as
+ * every other hand-picked threshold in this codebase, e.g.
+ * `EMBEDDING_SIMILARITY_THRESHOLD`/`ASK_RELEVANCE_THRESHOLD`) — long enough
+ * that a normal-latency call essentially never gets cut off, short enough
+ * to put a real ceiling on the worst case a student waits through.
+ */
+const EMBEDDING_TIMEOUT_MS = 5000;
+
+/** Rejects after `ms` — paired with a `cancel()` so the timer doesn't keep firing after the real call already won the race. */
+function timeoutAfter(ms: number): { promise: Promise<never>; cancel: () => void } {
+  let timer: ReturnType<typeof setTimeout>;
+  const promise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`embedText timed out after ${ms}ms`)), ms);
+  });
+  return { promise, cancel: () => clearTimeout(timer) };
+}
+
+/**
  * Computes a semantic embedding vector for a short piece of text. Two
  * callers as of the "Ask Rescript" pass, both reusing this exact function
  * rather than either building a second embedding pipeline:
@@ -56,13 +93,17 @@ export const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
  * instead — see that feature's own doc comments for why.
  */
 export async function embedText(text: string): Promise<number[] | null> {
+  const { promise: timeoutPromise, cancel } = timeoutAfter(EMBEDDING_TIMEOUT_MS);
   try {
     const keys = getGeminiApiKeys();
     const client = getGeminiClientForKey(keys[0]);
-    const response = await client.models.embedContent({
-      model: GEMINI_EMBEDDING_MODEL,
-      contents: text,
-    });
+    const response = await Promise.race([
+      client.models.embedContent({
+        model: GEMINI_EMBEDDING_MODEL,
+        contents: text,
+      }),
+      timeoutPromise,
+    ]);
     const values = response.embeddings?.[0]?.values;
     if (!values || values.length === 0) {
       console.error("EMBEDDING_ERROR", "Gemini returned no embedding values for this title.");
@@ -72,5 +113,7 @@ export async function embedText(text: string): Promise<number[] | null> {
   } catch (err) {
     console.error("EMBEDDING_ERROR", err instanceof Error ? err.message : String(err));
     return null;
+  } finally {
+    cancel();
   }
 }
