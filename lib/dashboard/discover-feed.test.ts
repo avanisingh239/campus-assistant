@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDiscoverFeed, isDiscoveryWorthy } from "./discover-feed";
+import { buildDiscoverFeed, excludeNotInterested, isDiscoveryWorthy } from "./discover-feed";
 import type { DashboardAnnouncement } from "./types";
 
 function announcement(overrides: Partial<DashboardAnnouncement> = {}): DashboardAnnouncement {
@@ -78,6 +78,30 @@ describe("buildDiscoverFeed", () => {
     const inputCopy = [...input];
     buildDiscoverFeed(input);
     expect(input).toEqual(inputCopy);
+  });
+});
+
+describe("excludeNotInterested", () => {
+  it("excludes announcements marked not_interested, keeping every other status", () => {
+    const none = announcement({ id: "none", engagementStatus: "none" });
+    const interested = announcement({ id: "interested", engagementStatus: "interested" });
+    const registered = announcement({ id: "registered", engagementStatus: "registered" });
+    const notInterested = announcement({ id: "not-interested", engagementStatus: "not_interested" });
+
+    const result = excludeNotInterested([none, interested, registered, notInterested]);
+
+    expect(result.map((a) => a.id).sort()).toEqual(["interested", "none", "registered"]);
+  });
+
+  it("does not mutate the input array", () => {
+    const input = [announcement({ id: "a", engagementStatus: "not_interested" }), announcement({ id: "b" })];
+    const inputCopy = [...input];
+    excludeNotInterested(input);
+    expect(input).toEqual(inputCopy);
+  });
+
+  it("returns an empty array when everything is not_interested", () => {
+    expect(excludeNotInterested([announcement({ engagementStatus: "not_interested" })])).toEqual([]);
   });
 });
 

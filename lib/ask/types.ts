@@ -26,11 +26,23 @@ export interface AskCandidateRow {
   title_embedding: number[] | null;
 }
 
-/** One retrieved announcement, shown alongside the synthesized answer so a student can see exactly what it was drawn from. */
+/**
+ * One retrieved announcement, shown alongside the synthesized answer so a
+ * student can see exactly what it was drawn from. `sourceGroupName` is the
+ * announcement's EARLIEST linked source's `messages.source_group_name`
+ * (lib/ask/source-group-names.ts's `resolveEarliestSourceGroupNames`) —
+ * `null` when that source itself never had one, or when the
+ * `announcement_sources`/`messages` lookup failed (see lib/ask/actions.ts's
+ * own doc comment for why that degrades gracefully rather than failing
+ * the whole answer). The UI falls back to the same "UNKNOWN SOURCE" label
+ * the dashboard card's own trace-to-source section already uses for this
+ * exact case.
+ */
 export interface AskSource {
   id: string;
   title: string;
   category: AnnouncementCategory;
+  sourceGroupName: string | null;
 }
 
 export interface AskResult {

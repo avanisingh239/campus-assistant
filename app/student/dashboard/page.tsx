@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { shapeAnnouncements } from "@/lib/dashboard/shape-announcements";
 import { buildDiffSummary } from "@/lib/dashboard/diff-summary";
+import { excludeNotInterested } from "@/lib/dashboard/discover-feed";
 import { pickUrgentAnnouncementIds, sortByPriorityScore } from "@/lib/dashboard/priority";
 import { DashboardClient } from "./dashboard-client";
 
@@ -121,10 +122,31 @@ export default async function StudentDashboardPage() {
   }
 
   const now = new Date();
+  // Real bug found in testing: "Not Interested" (docs/product-spec.md's
+  // own "suppresses resurfacing in digests/summaries without deleting
+  // history") was only ever applied to /student/dont-miss-this
+  // (buildDiscoverFeed's own excludeNotInterested call) — the main Action
+  // Plan feed here had no equivalent, so a Not-Interested item could still
+  // appear, sort normally, and even win the URGENT ribbon. Fixed by
+  // applying the exact same exclusion this dashboard's own "Don't miss"
+  // stat-row count already reuses (lib/dashboard/discover-feed.ts's
+  // excludeNotInterested) as early as possible — right after shaping,
+  // before either sortByPriorityScore or pickUrgentAnnouncementIds ever
+  // see the list. One filter application satisfies both halves of the
+  // fix at once: an excluded item can't appear in the card feed (it's
+  // simply not in `announcements` anymore) and structurally can't win the
+  // ribbon either (pickUrgentAnnouncementIds only iterates what it's
+  // given). This is a display filter only — `student_announcement_status`
+  // itself is never touched, so the student's engagement history is
+  // unaffected; it also means buildDiffSummary below no longer resurfaces
+  // a Not-Interested item's own updates in the "N updates since you last
+  // checked" banner, which is the same "digests/summaries" principle
+  // applied consistently, not a separate special case.
+  const nonSuppressedAnnouncements = excludeNotInterested(shapedAnnouncements);
   // Real, live-computed priority order (lib/dashboard/priority.ts) — this
   // is the card feed's actual sort now, not the DB query's now-dropped
   // (always-0) priority_score order above.
-  const announcements = sortByPriorityScore(shapedAnnouncements, now);
+  const announcements = sortByPriorityScore(nonSuppressedAnnouncements, now);
   const urgentIds = pickUrgentAnnouncementIds(announcements, now);
   const diffSummary = buildDiffSummary(announcements, lastSeenResult.data?.last_seen_at ?? null);
 

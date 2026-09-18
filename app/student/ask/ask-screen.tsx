@@ -12,6 +12,7 @@ import { AppHeader } from "../app-header";
 import { TabRow } from "../tab-row";
 import shellStyles from "../shell.module.css";
 import ingestStyles from "../ingest/ingest.module.css";
+import cardStyles from "../dashboard/dashboard.module.css";
 import uiStyles from "@/components/ui.module.css";
 import styles from "./ask.module.css";
 
@@ -135,6 +136,9 @@ export function AskScreen({ now }: { now: Date }) {
                       <a href={`/student/dashboard#announcement-${source.id}`} className={styles.sourceLink}>
                         <span className={ingestStyles.extractedCategory}>{CATEGORY_LABELS[source.category]}</span>
                         <span className={ingestStyles.extractedTitle}>{source.title}</span>
+                        <span className={cardStyles.srcLabel}>
+                          FROM {(source.sourceGroupName ?? "UNKNOWN SOURCE").toUpperCase()}
+                        </span>
                       </a>
                     </li>
                   ))}
