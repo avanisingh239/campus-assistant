@@ -9,7 +9,7 @@ import type { AskCandidateRow } from "./types";
 const QUESTION_EMBEDDING = [1, 0];
 const HIGHLY_RELEVANT = [0.9, Math.sqrt(1 - 0.9 ** 2)]; // cosine sim 0.9
 const AT_THRESHOLD = [ASK_RELEVANCE_THRESHOLD, Math.sqrt(1 - ASK_RELEVANCE_THRESHOLD ** 2)]; // exactly the threshold
-const SOMEWHAT_RELEVANT = [0.6, Math.sqrt(1 - 0.6 ** 2)]; // cosine sim 0.6, above threshold
+const SOMEWHAT_RELEVANT = [0.8, Math.sqrt(1 - 0.8 ** 2)]; // cosine sim 0.8, above threshold but below HIGHLY_RELEVANT
 const NOT_RELEVANT = [0.1, Math.sqrt(1 - 0.1 ** 2)]; // cosine sim 0.1, below threshold
 
 function candidate(overrides: Partial<AskCandidateRow> = {}): AskCandidateRow {

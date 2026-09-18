@@ -97,13 +97,27 @@ export async function embedText(text: string): Promise<number[] | null> {
   try {
     const keys = getGeminiApiKeys();
     const client = getGeminiClientForKey(keys[0]);
-    const response = await Promise.race([
-      client.models.embedContent({
-        model: GEMINI_EMBEDDING_MODEL,
-        contents: text,
-      }),
-      timeoutPromise,
-    ]);
+    const embedPromise = client.models.embedContent({
+      model: GEMINI_EMBEDDING_MODEL,
+      contents: text,
+    });
+    // Real crash found in testing on /student/ask ("do I have to go to the
+    // maths class on Tuesday" produced a raw server error instead of an
+    // answer or the honest "nothing found" fallback): when the timeout
+    // above wins the race below, `embedPromise` isn't cancelled — it's
+    // just abandoned, still running in the background. If it later
+    // REJECTS (a slow Gemini call that eventually errors out, arriving
+    // after we've already given up and moved on), that rejection has no
+    // `.catch()` anywhere, which Node treats as an unhandled promise
+    // rejection — capable of crashing the whole request/process, not just
+    // failing this one function gracefully as designed. Attaching a no-op
+    // catch directly to this exact promise object marks it "handled" the
+    // moment it settles, independent of which side of `Promise.race`
+    // below actually resolves this call's return value — it changes
+    // nothing about what `embedText` returns, only guarantees a late
+    // rejection is swallowed instead of surfacing as an unrelated crash.
+    embedPromise.catch(() => {});
+    const response = await Promise.race([embedPromise, timeoutPromise]);
     const values = response.embeddings?.[0]?.values;
     if (!values || values.length === 0) {
       console.error("EMBEDDING_ERROR", "Gemini returned no embedding values for this title.");
