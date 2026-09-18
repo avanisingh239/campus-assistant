@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { embedText } from "@/lib/ai/embed";
 import { synthesizeAnswer, AnswerError } from "@/lib/ai/answer";
-import { selectRelevantCandidates } from "./retrieval";
+import { rankBySimilarity, selectRelevantCandidates } from "./retrieval";
 import { buildContextBlock } from "./format-context";
 import { resolveEarliestSourceGroupNames } from "./source-group-names";
 import type { AskCandidateRow, AskResult } from "./types";
@@ -72,6 +72,26 @@ export async function askQuestion(question: string): Promise<AskResult> {
 
   // Retrieval: plain code, zero API calls, no matter how many
   // announcements this student has.
+  //
+  // Real bug found in testing, once the feature actually went live: the
+  // relevance threshold (see lib/ask/retrieval.ts's own doc comment) was
+  // originally a pure guess, since no live Gemini embeddings were ever
+  // available to calibrate it against real question/title pairs before
+  // this feature shipped. This log is the calibration mechanism for
+  // everything after that: it prints every real candidate's actual
+  // cosine-similarity score against every real question asked, in
+  // production, going forward — genuinely relevant and clearly irrelevant
+  // candidates alike, not just the ones that clear the current threshold
+  // (`selectRelevantCandidates` below still makes the real decision; this
+  // is read-only diagnostics, not a second, competing decision path). If
+  // `ASK_RELEVANCE_THRESHOLD` (currently 0.7) ever needs re-tuning again,
+  // the real numbers to tune it against are right here in the server
+  // logs, not another guess.
+  const ranked = rankBySimilarity(questionEmbedding, candidates);
+  console.log(
+    "ASK_RETRIEVAL_SCORES",
+    JSON.stringify({ question: trimmed, ranked: ranked.map((r) => ({ title: r.candidate.title, score: r.score })) }),
+  );
   const relevant = selectRelevantCandidates(questionEmbedding, candidates);
 
   if (relevant.length === 0) {

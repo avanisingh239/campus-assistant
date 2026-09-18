@@ -26,25 +26,45 @@ import type { AskCandidateRow } from "./types";
  * question like "when's my next exam" and a title like "Midterm Exam
  * Schedule Posted" describe the same topic without being anywhere near
  * paraphrases of each other, so reusing the dedup threshold here would
- * reject almost everything relevant. 0.5 is a documented, revisitable
- * starting point — the same honesty this codebase's other hand-picked
- * thresholds (the old Jaccard 0.6, dedup's own 0.85) carry when they're a
- * judgment call rather than a derivation: no live Gemini embeddings were
- * available in this sandbox to calibrate against real question/title
- * pairs (see lib/ai/embed.ts's own doc comment on why the network call
- * itself can't be exercised here), so this is the first number to
- * re-tune once real usage data exists.
+ * reject almost everything relevant.
+ *
+ * Real bug found in testing, once the feature actually went live: 0.5 was
+ * genuinely too loose. Asking "is my BEE assignment due" returned a
+ * correct answer, but the sources list also included clearly-unrelated
+ * cancellations and events that scored ≥0.5 against that question purely
+ * on shared "campus announcement"-shaped phrasing, not real topical
+ * overlap — a known property of short-text embedding spaces (similarly-
+ * structured sentences in the same narrow domain tend to sit closer
+ * together than their actual meaning would suggest). Raised to **0.7**: a
+ * real, deliberate improvement over the reported symptom, not a fresh
+ * guess, but still honestly a documented, revisitable starting point —
+ * this sandbox still has no live Gemini access to calibrate the *exact*
+ * separating value against real production vectors (same standing
+ * limitation as every other embedding-related note in this codebase).
+ * `lib/ask/actions.ts` now logs every real candidate's actual score on
+ * every real question asked, specifically so this number can be tuned
+ * precisely from real logged data rather than reasoning about it in the
+ * abstract a second time — see that file's own doc comment.
  */
-export const ASK_RELEVANCE_THRESHOLD = 0.5;
+export const ASK_RELEVANCE_THRESHOLD = 0.7;
 
 /**
  * At most this many retrieved announcements are ever handed to the
- * synthesis call as context. Keeps the prompt small and, more importantly,
- * keeps the answer honest — once there are dozens of candidates clearing
- * the relevance bar, the least-relevant ones at the tail would only dilute
- * the model's grounding in the genuinely best matches at the top.
+ * synthesis call as context AND shown to the student as sources (`lib/ask/
+ * actions.ts`'s `askQuestion` builds its returned `sources` from this same
+ * capped list — there's no second, separate display cap). Keeps the
+ * prompt small and, more importantly, keeps the answer honest — once
+ * there are dozens of candidates clearing the relevance bar, the least-
+ * relevant ones at the tail would only dilute the model's grounding in the
+ * genuinely best matches at the top.
+ *
+ * Lowered from 5 to **3** in the same later pass that raised
+ * `ASK_RELEVANCE_THRESHOLD` above — a flood of sources undermines the
+ * "precise, honest retrieval" story this feature is supposed to tell, per
+ * the task's own explicit ask, independent of whether the threshold fix
+ * alone would have already narrowed the list enough on its own.
  */
-export const MAX_CONTEXT_ITEMS = 5;
+export const MAX_CONTEXT_ITEMS = 3;
 
 export interface RankedCandidate {
   candidate: AskCandidateRow;
