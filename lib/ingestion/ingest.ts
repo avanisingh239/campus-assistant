@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractAnnouncements, ExtractionError } from "@/lib/ai/extract";
-import { embedTitle } from "@/lib/ai/embed";
+import { embedText } from "@/lib/ai/embed";
 import {
   syncFreeSlotsForCancellation,
   matchAnnouncementToOpenFreeSlots,
@@ -121,12 +121,13 @@ export async function ingestRawText(
     // call per extracted item, computed BEFORE the dedup check since that
     // check needs it — never re-embedding an existing candidate, which
     // already has its own `title_embedding` stored from when IT was
-    // created. `embedTitle` (lib/ai/embed.ts) never throws — a failed/
-    // rate-limited call logs and resolves to `null`, which the dedup
-    // matcher already treats as "fall back to the exact linked_class_name
-    // path only for this item," never as a reason to fail the whole
-    // ingestion.
-    const titleEmbedding = await embedTitle(item.title);
+    // created. `embedText` (lib/ai/embed.ts — also the "Ask Rescript"
+    // feature's second caller, see that file's own doc comment) never
+    // throws — a failed/rate-limited call logs and resolves to `null`,
+    // which the dedup matcher already treats as "fall back to the exact
+    // linked_class_name path only for this item," never as a reason to
+    // fail the whole ingestion.
+    const titleEmbedding = await embedText(item.title);
     const row = { ...toAnnouncementRow(item, trimmed), title_embedding: titleEmbedding };
 
     const dedupResult = await findAndMergeDuplicate(

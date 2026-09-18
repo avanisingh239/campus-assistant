@@ -123,7 +123,7 @@ function linkedClassNameMatches(a: DedupFields, b: DedupFields): boolean {
  * correctly places them close together. `embeddingsIndicateMatch`
  * (lib/deduplication/embedding-similarity.ts) does the actual cosine-
  * similarity comparison against each side's `title_embedding` — computed
- * once per item at ingestion time (lib/ai/embed.ts's `embedTitle`, called
+ * once per item at ingestion time (lib/ai/embed.ts's `embedText`, called
  * from lib/ingestion/ingest.ts), not re-computed here. A `null` embedding
  * on either side (an embedding call that failed/rate-limited for that
  * item, or an older announcement ingested before this pass existed) makes

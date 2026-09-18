@@ -8,7 +8,7 @@
  * be described as) it. This file is pure and unit-tested, no network
  * access — same "pure function, no API call" shape as everything else in
  * lib/deduplication/; the one real API call this upgrade needs
- * (lib/ai/embed.ts's `embedTitle`) happens once per extracted item at
+ * (lib/ai/embed.ts's `embedText`) happens once per extracted item at
  * ingestion time, never here.
  */
 
@@ -61,7 +61,7 @@ export const EMBEDDING_SIMILARITY_THRESHOLD = 0.85;
 /**
  * The actual decision `match.ts` calls: do these two titles' embeddings
  * indicate the same real-world notice? A `null` on either side — the
- * documented, graceful result of `embedTitle` failing or hitting a rate
+ * documented, graceful result of `embedText` failing or hitting a rate
  * limit for that item (lib/ai/embed.ts), or an older announcement ingested
  * before this pass existed and so never got an embedding stored at all —
  * always returns `false` rather than guessing. This is deliberate, not an

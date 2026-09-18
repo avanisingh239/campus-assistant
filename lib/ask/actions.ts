@@ -1,0 +1,106 @@
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
+import { embedText } from "@/lib/ai/embed";
+import { synthesizeAnswer, AnswerError } from "@/lib/ai/answer";
+import { selectRelevantCandidates } from "./retrieval";
+import { buildContextBlock } from "./format-context";
+import type { AskCandidateRow, AskResult } from "./types";
+
+/**
+ * "Ask Rescript" — a natural-language question box over a student's own
+ * visible announcements, using real semantic retrieval (embeddings), not
+ * keyword search and not a single ungrounded prompt to Gemini. See
+ * CLAUDE.md's own "Ask Rescript" section for the full design.
+ *
+ * EXACTLY two Gemini API calls per question, never more, and never
+ * proportional to how many announcements exist — the tight ~5rpm/~100rpd
+ * budget (CLAUDE.md's §Gemini rate limits) makes that a hard design
+ * constraint, not a nice-to-have:
+ *   1. `embedText` (lib/ai/embed.ts) — embeds the question itself. The
+ *      SAME embedding call lib/ingestion/ingest.ts already uses for
+ *      announcement titles, reused directly rather than a second,
+ *      parallel embedding pipeline.
+ *   2. `synthesizeAnswer` (lib/ai/answer.ts) — synthesizes the final
+ *      answer from whatever relevant context retrieval below found.
+ * The retrieval step IN BETWEEN (lib/ask/retrieval.ts's cosine-similarity
+ * ranking against every candidate's already-stored `title_embedding`) is
+ * plain code — no API call at all, regardless of how many announcements a
+ * student has.
+ */
+export async function askQuestion(question: string): Promise<AskResult> {
+  const trimmed = question.trim();
+  if (trimmed.length < 3) {
+    throw new Error("Ask a real question — at least a few characters.");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in.");
+
+  // Privacy: this is deliberately the EXACT SAME RLS-respecting client and
+  // unfiltered `announcements` query app/student/dashboard/page.tsx uses
+  // (just a narrower column list — see lib/ask/types.ts). Whatever comes
+  // back here is, by construction, exactly what this student is allowed
+  // to see, enforced by supabase/schema.sql's "announcements readable by
+  // own class or shared category" policy at the DATABASE level — not by
+  // any filter added in this file, and never the service-role client
+  // (unlike the ingestion pipeline). A student's question can never
+  // surface an announcement from a class they can't already see on their
+  // own dashboard, because this route to the data is the same route.
+  const { data: rows, error } = await supabase
+    .from("announcements")
+    .select(
+      "id, category, title, why_it_matters, what_to_do_next, confidence, event_date, start_time, end_time, deadline_at, title_embedding",
+    );
+  if (error) throw new Error(`Failed to load announcements: ${error.message}`);
+
+  const candidates = (rows ?? []) as AskCandidateRow[];
+
+  // Call 1 of exactly 2.
+  const questionEmbedding = await embedText(trimmed);
+  if (!questionEmbedding) {
+    // Unlike dedup's use of embedText, there's no cheaper fallback path
+    // available here — without an embedding for the question itself,
+    // there is nothing to retrieve against, so this has to be a real,
+    // visible failure rather than a silent degradation.
+    throw new AnswerError("Couldn't process that question right now — try again in a moment.");
+  }
+
+  // Retrieval: plain code, zero API calls, no matter how many
+  // announcements this student has.
+  const relevant = selectRelevantCandidates(questionEmbedding, candidates);
+
+  if (relevant.length === 0) {
+    // Deliberately skips the synthesis call entirely — there's nothing
+    // relevant to synthesize FROM, so spending the second call anyway
+    // would either waste it on a context-free answer or risk Gemini
+    // padding out something not actually grounded in this student's real
+    // announcements. This keeps the total at ONE call for this outcome,
+    // not two — strictly inside the "never more than two" budget, not
+    // just at its edge.
+    return {
+      answer:
+        "I don't have anything matching that yet — nothing in your visible announcements looks related to this question.",
+      sources: [],
+    };
+  }
+
+  // Call 2 of exactly 2 — synthesizes the answer from ONLY the retrieved
+  // context above. No retry loop, no key rotation (unlike lib/ai/
+  // extract.ts's extraction calls): retrying here would itself blow the
+  // two-call budget this whole feature is designed around.
+  const contextBlock = buildContextBlock(relevant.map((r) => r.candidate));
+  const answer = await synthesizeAnswer(trimmed, contextBlock);
+
+  return {
+    answer,
+    sources: relevant.map((r) => ({
+      id: r.candidate.id,
+      title: r.candidate.title,
+      category: r.candidate.category,
+    })),
+  };
+}

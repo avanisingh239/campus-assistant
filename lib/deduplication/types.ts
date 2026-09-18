@@ -16,7 +16,7 @@ export interface DedupFields {
   linked_class_name: string | null;
   seat_count: number | null;
   /**
-   * The title's semantic embedding (lib/ai/embed.ts's `embedTitle`),
+   * The title's semantic embedding (lib/ai/embed.ts's `embedText`),
    * computed once at ingestion time — `null` when embedding failed/rate-
    * limited for this item (see embed.ts's own doc comment) or when the
    * candidate predates this feature and never had one computed at all.

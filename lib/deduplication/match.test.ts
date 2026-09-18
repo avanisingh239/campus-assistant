@@ -112,7 +112,7 @@ describe("findDuplicateMatch — embedding-based semantic matching (the real ML 
     expect(findDuplicateMatch(newItem, "CSE-2028-A", [existing])).toBeNull();
   });
 
-  it("does not merge when the new item's embedding is null (the documented graceful fallback — embedTitle failed/rate-limited for this item)", () => {
+  it("does not merge when the new item's embedding is null (the documented graceful fallback — embedText failed/rate-limited for this item)", () => {
     const newItem = fields({ title: "Database Systems fee deadline", title_embedding: null });
     const existing = candidate({
       title: "Database Systems fee payment deadline",

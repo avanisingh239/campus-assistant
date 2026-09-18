@@ -176,6 +176,16 @@ export function ShareIcon() {
   );
 }
 
+/** Magnifying-glass glyph for the "Ask Rescript" tab (app/student/tab-row.tsx) and its question input. */
+export function SearchIcon() {
+  return (
+    <svg {...strokeProps}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.35-4.35" />
+    </svg>
+  );
+}
+
 /** Filled graduation-cap glyph for the student role tile on /login. */
 export function GraduationCapIcon() {
   return (

@@ -1,0 +1,27 @@
+/*
+ * /student/ask — "Ask Rescript." Almost everything visual is reused
+ * directly from ../ingest/ingest.module.css (form/processing/result card
+ * shapes are already exactly what this screen needs) and
+ * components/ui.module.css (Button/TextField). This file adds only the
+ * two things nothing existing already provided.
+ */
+
+/* Lets a reused .extractedItem chip (ingest.module.css) double as a
+   clickable link to the source announcement on /student/dashboard,
+   without inheriting a browser default <a> underline/blue that nothing
+   else in this design system uses. */
+.sourceLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-decoration: none;
+  color: inherit;
+}
+
+.sourcesLabel {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--forest);
+  margin: 4px 0 10px;
+}
