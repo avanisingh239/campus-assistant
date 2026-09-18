@@ -210,6 +210,39 @@
   }
 }
 
+/* ===== ASK RESCRIPT FLOATING SHORTCUT ===== */
+/* A persistent corner shortcut into /student/ask, rendered once in
+   app/student/layout.tsx (not per-page) so it appears on every real
+   student screen automatically — see ask-shortcut.tsx's own doc comment.
+   Same circular-badge recipe as .heroBadge above (gold fill, forest-deep
+   border, hard drop shadow) rather than a new visual language — this app's
+   existing pattern for "a circular thing that draws the eye" on this dark
+   canvas. */
+.askShortcut {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 3px solid var(--forest-deep);
+  box-shadow: 4px 4px 0 var(--forest-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s var(--bounce);
+}
+.askShortcut:hover {
+  transform: translateY(-3px) scale(1.03);
+}
+.askShortcut svg {
+  width: 34px;
+  height: 34px;
+  display: block;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 640px) {
   .wrap {
@@ -228,5 +261,15 @@
   .cards {
     grid-template-columns: 1fr;
     gap: 28px;
+  }
+  .askShortcut {
+    right: 14px;
+    bottom: 14px;
+    width: 52px;
+    height: 52px;
+  }
+  .askShortcut svg {
+    width: 28px;
+    height: 28px;
   }
 }

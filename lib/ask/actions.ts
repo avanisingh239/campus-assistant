@@ -5,6 +5,7 @@ import { embedText } from "@/lib/ai/embed";
 import { synthesizeAnswer, AnswerError } from "@/lib/ai/answer";
 import { selectRelevantCandidates } from "./retrieval";
 import { buildContextBlock } from "./format-context";
+import { resolveEarliestSourceGroupNames } from "./source-group-names";
 import type { AskCandidateRow, AskResult } from "./types";
 
 /**
@@ -95,12 +96,46 @@ export async function askQuestion(question: string): Promise<AskResult> {
   const contextBlock = buildContextBlock(relevant.map((r) => r.candidate));
   const answer = await synthesizeAnswer(trimmed, contextBlock);
 
+  // Which group each cited announcement came from — the same
+  // announcement_sources -> messages join app/student/dashboard/page.tsx
+  // already does for its own trace-to-source section, scoped down to just
+  // the (at most MAX_CONTEXT_ITEMS) announcements actually being cited
+  // here, not every announcement this student can see. Two plain Supabase
+  // queries through the same RLS client already in scope above — no
+  // Gemini call, so this doesn't touch the two-call budget at all.
+  // Deliberately degrades gracefully rather than throwing on failure: a
+  // missing group-name label is a much smaller loss than losing the
+  // synthesized answer this call already paid for.
+  const relevantIds = relevant.map((r) => r.candidate.id);
+  let sourceGroupNames = new Map<string, string | null>();
+  const { data: sourceLinks, error: sourceLinksError } = await supabase
+    .from("announcement_sources")
+    .select("announcement_id, message_id, created_at")
+    .in("announcement_id", relevantIds);
+
+  if (sourceLinksError) {
+    console.error("ASK_SOURCE_GROUP_NAME_ERROR", sourceLinksError.message);
+  } else {
+    const messageIds = [...new Set((sourceLinks ?? []).map((s) => s.message_id as string))];
+    const { data: messageRows, error: messagesError } =
+      messageIds.length > 0
+        ? await supabase.from("messages").select("id, source_group_name").in("id", messageIds)
+        : { data: [], error: null };
+
+    if (messagesError) {
+      console.error("ASK_SOURCE_GROUP_NAME_ERROR", messagesError.message);
+    } else {
+      sourceGroupNames = resolveEarliestSourceGroupNames(sourceLinks ?? [], messageRows ?? []);
+    }
+  }
+
   return {
     answer,
     sources: relevant.map((r) => ({
       id: r.candidate.id,
       title: r.candidate.title,
       category: r.candidate.category,
+      sourceGroupName: sourceGroupNames.get(r.candidate.id) ?? null,
     })),
   };
 }

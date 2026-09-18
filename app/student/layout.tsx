@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignOutButton } from "../sign-out-button";
+import { AskShortcut } from "./ask-shortcut";
 
 // Student Shell: PWA nav + offline banner slot (docs/architecture.md §2).
 // Deliberately bare — the real dashboard/timetable/communities UI is being
@@ -37,6 +38,7 @@ export default function StudentLayout({
         <SignOutButton />
       </header>
       {children}
+      <AskShortcut />
     </div>
   );
 }
