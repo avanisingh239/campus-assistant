@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { shapeAnnouncements } from "@/lib/dashboard/shape-announcements";
 import { buildDiffSummary } from "@/lib/dashboard/diff-summary";
-import { excludeNotInterested } from "@/lib/dashboard/discover-feed";
+import { excludeNotInterested, onlyNotInterested } from "@/lib/dashboard/discover-feed";
 import { pickUrgentAnnouncementIds, sortByPriorityScore } from "@/lib/dashboard/priority";
 import { DashboardClient } from "./dashboard-client";
 
@@ -150,9 +150,22 @@ export default async function StudentDashboardPage() {
   const urgentIds = pickUrgentAnnouncementIds(announcements, now);
   const diffSummary = buildDiffSummary(announcements, lastSeenResult.data?.last_seen_at ?? null);
 
+  // Real gap found in testing, right after the Not-Interested suppression
+  // fix above shipped: hiding these from the main feed meant there was no
+  // longer any way for a student to find one again and change their mind
+  // — the card holding the status pills was simply gone. This is the exact
+  // complement of `excludeNotInterested` (taken from the same pre-filter
+  // `shapedAnnouncements` list, before that exclusion runs), passed as its
+  // own prop for DashboardClient's collapsed "dismissed items" section —
+  // see that file for how a status change moves an item between this list
+  // and the main one. Nothing above this line changes: `announcements`/
+  // `urgentIds`/`diffSummary` are still computed exactly as they were.
+  const dismissedAnnouncements = onlyNotInterested(shapedAnnouncements);
+
   return (
     <DashboardClient
       announcements={announcements}
+      dismissedAnnouncements={dismissedAnnouncements}
       urgentIds={urgentIds}
       diffSummary={diffSummary}
       nowIso={now.toISOString()}

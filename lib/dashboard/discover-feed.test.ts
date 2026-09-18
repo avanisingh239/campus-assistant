@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDiscoverFeed, excludeNotInterested, isDiscoveryWorthy } from "./discover-feed";
+import { buildDiscoverFeed, excludeNotInterested, isDiscoveryWorthy, onlyNotInterested } from "./discover-feed";
 import type { DashboardAnnouncement } from "./types";
 
 function announcement(overrides: Partial<DashboardAnnouncement> = {}): DashboardAnnouncement {
@@ -102,6 +102,41 @@ describe("excludeNotInterested", () => {
 
   it("returns an empty array when everything is not_interested", () => {
     expect(excludeNotInterested([announcement({ engagementStatus: "not_interested" })])).toEqual([]);
+  });
+});
+
+describe("onlyNotInterested", () => {
+  it("keeps only announcements marked not_interested", () => {
+    const none = announcement({ id: "none", engagementStatus: "none" });
+    const interested = announcement({ id: "interested", engagementStatus: "interested" });
+    const registered = announcement({ id: "registered", engagementStatus: "registered" });
+    const notInterested = announcement({ id: "not-interested", engagementStatus: "not_interested" });
+
+    const result = onlyNotInterested([none, interested, registered, notInterested]);
+
+    expect(result.map((a) => a.id)).toEqual(["not-interested"]);
+  });
+
+  it("does not mutate the input array", () => {
+    const input = [announcement({ id: "a", engagementStatus: "not_interested" }), announcement({ id: "b" })];
+    const inputCopy = [...input];
+    onlyNotInterested(input);
+    expect(input).toEqual(inputCopy);
+  });
+
+  it("returns an empty array when nothing is not_interested", () => {
+    expect(onlyNotInterested([announcement({ engagementStatus: "interested" })])).toEqual([]);
+  });
+
+  it("is the exact complement of excludeNotInterested", () => {
+    const items = [
+      announcement({ id: "a", engagementStatus: "none" }),
+      announcement({ id: "b", engagementStatus: "not_interested" }),
+      announcement({ id: "c", engagementStatus: "registered" }),
+    ];
+    const kept = excludeNotInterested(items).map((a) => a.id);
+    const dismissed = onlyNotInterested(items).map((a) => a.id);
+    expect([...kept, ...dismissed].sort()).toEqual(items.map((a) => a.id).sort());
   });
 });
 

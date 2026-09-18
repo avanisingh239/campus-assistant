@@ -35,6 +35,21 @@ export function excludeNotInterested(announcements: DashboardAnnouncement[]): Da
 }
 
 /**
+ * The exact complement of `excludeNotInterested` above — every
+ * announcement the student has marked not_interested, for the dashboard's
+ * own collapsed "dismissed items" section (see CLAUDE.md's "let students
+ * review and change Not Interested items" fix). `excludeNotInterested`
+ * hides these from the main feed by design; this is what lets a student
+ * find one again to change their mind, without a second, independently
+ * -maintained copy of the same one-line status check —
+ * `[excludeNotInterested(xs), onlyNotInterested(xs)]` always exactly
+ * partitions `xs` (as a multiset, ignoring order).
+ */
+export function onlyNotInterested(announcements: DashboardAnnouncement[]): DashboardAnnouncement[] {
+  return announcements.filter((a) => a.engagementStatus === "not_interested");
+}
+
+/**
  * Filters and sorts the "Don't Miss This" discovery feed
  * (docs/product-spec.md Area A.1 / Feature 4.3) from the same
  * DashboardAnnouncement shape the Action Plan dashboard uses.
