@@ -42,7 +42,7 @@ export default async function StudentDiscoverPage() {
   const { data: announcementRows, error: announcementsError } = await supabase
     .from("announcements")
     .select(
-      "id, category, title, why_it_matters, what_to_do_next, confidence, confidence_note, event_date, start_time, end_time, deadline_at, link_url, link_verified, seat_count, seats_unclear, priority_score, created_at, updated_at",
+      "id, category, title, why_it_matters, what_to_do_next, confidence, confidence_note, event_date, start_time, end_time, deadline_at, link_url, link_verified, payment_risk, seat_count, seats_unclear, priority_score, created_at, updated_at",
     )
     .or(
       "category.eq.opportunity,and(category.eq.event,seat_count.not.is.null),and(category.eq.event,seats_unclear.eq.true)",

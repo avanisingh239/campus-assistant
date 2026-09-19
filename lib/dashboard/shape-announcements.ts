@@ -30,6 +30,7 @@ export interface RawAnnouncementRow {
   deadline_at: string | null;
   link_url: string | null;
   link_verified: boolean;
+  payment_risk: boolean;
   seat_count: number | null;
   seats_unclear: boolean;
   priority_score: number | null;
@@ -112,6 +113,7 @@ export function shapeAnnouncements(
       deadline_at: a.deadline_at,
       link_url: a.link_url,
       link_verified: a.link_verified,
+      payment_risk: a.payment_risk,
       seat_count: a.seat_count,
       seats_unclear: a.seats_unclear,
       priority_score: a.priority_score ?? 0,

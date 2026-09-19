@@ -191,6 +191,18 @@ create table announcements (
   -- compare," never as "assume similar."
   title_embedding jsonb,
 
+  -- Advance-fee scam detection (see CLAUDE.md's own section on this and
+  -- lib/ingestion/verify-link.ts's `detectPaymentRiskPattern`) — true only
+  -- when the source message's raw text contains BOTH an "already decided
+  -- positive outcome" phrase ("congratulations", "you've been selected")
+  -- AND a "pay to release/claim/unlock it" phrase, the actual advance-fee
+  -- scam structure, not payment language alone (a normal application fee
+  -- never trips this). Deterministic content check, computed at ingestion
+  -- time, same architectural shape as link_verified above but independent
+  -- of it — this fires regardless of domain or which pipeline (student
+  -- paste, WhatsApp export/bot, admin form) the message came through.
+  payment_risk boolean not null default false,
+
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -538,6 +550,29 @@ create policy "admin reads own scope" on admin_scopes
 -- as "can't compare," so an old row just falls back to being matchable
 -- only via the exact `linked_class_name` path, same as it always was
 -- before this column existed).
+-- ============================================================
+
+
+-- ============================================================
+-- ADDED — Advance-fee scam detection (see CLAUDE.md's own section and
+-- lib/ingestion/verify-link.ts's `detectPaymentRiskPattern`). Extends the
+-- existing deterministic link-verification system with a second rule of
+-- the same shape: a message claiming an already-decided positive outcome
+-- ("congratulations", "you've been selected") co-occurring with a pay-to-
+-- claim/release/unlock ask — the real advance-fee scam structure, not
+-- payment language in isolation (a normal application/registration fee
+-- correctly never trips this).
+--
+-- This is a NEW COLUMN only — no policy change, same reasoning as
+-- title_embedding above (read/written through the exact same client every
+-- other `announcements` column already goes through):
+--
+--   alter table announcements add column payment_risk boolean not null default false;
+--
+-- Every pre-existing row gets `payment_risk = false` after this runs — a
+-- safe default (no old row retroactively flagged), matching the "old data
+-- doesn't survive a schema-shape migration, treat it as retired" precedent
+-- already established for the submitted_by_class_name migration above.
 -- ============================================================
 
 

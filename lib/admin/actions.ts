@@ -8,6 +8,7 @@ import {
 } from "@/lib/deterministic/sync";
 import { classUpdateSchema, societyUpdateSchema, type ClassUpdateFormInput, type SocietyUpdateFormInput } from "./validation";
 import { buildClassUpdateDraft, buildSocietyUpdateDraft } from "./build-submission";
+import { detectPaymentRiskPattern } from "@/lib/ingestion/verify-link";
 
 /**
  * Server Actions backing /admin/dashboard's two structured forms. Per
@@ -112,6 +113,14 @@ export async function submitClassUpdate(
       seats_unclear: false,
       link_url: null,
       link_verified: true,
+      // Same deterministic content check the paste/WhatsApp pipeline runs
+      // (lib/ingestion/map-to-announcement.ts) — the advance-fee-scam
+      // pattern is a property of the message TEXT, not of which channel it
+      // arrived through, so an admin-submitted update gets the exact same
+      // check against its own draft.raw_text, never skipped or weakened
+      // just because it came from a verified channel. See CLAUDE.md's own
+      // section on this and lib/ingestion/verify-link.ts's doc comment.
+      payment_risk: detectPaymentRiskPattern(draft.raw_text),
     })
     .select("id, title, category, event_date, created_at")
     .single();
@@ -203,6 +212,9 @@ export async function submitSocietyUpdate(
       // admin typing their own registration link is the trust case that
       // check exists to approximate in the first place.
       link_verified: draft.link_url !== null,
+      // Same channel-independent check as the class-update flow above —
+      // see that insert's own comment.
+      payment_risk: detectPaymentRiskPattern(draft.raw_text),
     })
     .select("id, title, category, event_date, created_at")
     .single();

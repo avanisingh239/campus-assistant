@@ -35,6 +35,7 @@ function announcement(overrides: Partial<DashboardAnnouncement> = {}): Dashboard
     deadline_at: null,
     link_url: null,
     link_verified: true,
+    payment_risk: false,
     seat_count: null,
     seats_unclear: false,
     priority_score: 0,
