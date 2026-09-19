@@ -6,6 +6,7 @@ import type { EngagementStatus } from "@/lib/deterministic/types";
 import { CATEGORY_LABELS, CONFIDENCE_LABELS, supportsEngagementToggle } from "@/lib/dashboard/category-meta";
 import { formatCapMeta, splitVerb, formatRelativeTimeCaps } from "@/lib/dashboard/format";
 import { WarningCircleIcon, ArrowMergeIcon, ChainLinkIcon } from "@/components/icons";
+import { assessDomainRisk, combinePaymentRiskSeverity } from "@/lib/ingestion/verify-link";
 import { CategoryIcon } from "./icons";
 import { confettiBurst } from "./confetti";
 import styles from "./dashboard.module.css";
@@ -48,6 +49,22 @@ export function Card({
     ? `Merged · ${announcement.sourceCount} sources`
     : CATEGORY_LABELS[announcement.category];
 
+  // Domain risk signals compound an already-triggered payment_risk warning
+  // — they never trigger one on their own (combinePaymentRiskSeverity
+  // enforces that). Computed here, at render, rather than stored on the
+  // row: it needs no schema migration, stays correct if the domain
+  // red-flag lists ever change, and applies retroactively to announcements
+  // ingested before this check existed. `title` + `why_it_matters` stands
+  // in for the original raw message text (not available on this shaped
+  // row) for the claimed-institution-mismatch check — the same text a
+  // student already reads on the card, so nothing here relies on a signal
+  // the student can't also see. See lib/ingestion/verify-link.ts's own
+  // doc comments for the full reasoning.
+  const domainRisk = announcement.link_url
+    ? assessDomainRisk(announcement.link_url, `${announcement.title} ${announcement.why_it_matters ?? ""}`)
+    : { risky: false, reasons: [] };
+  const paymentRiskWarning = combinePaymentRiskSeverity(announcement.payment_risk, domainRisk);
+
   async function handlePillClick(status: EngagementStatus, event: React.MouseEvent<HTMLButtonElement>) {
     const button = event.currentTarget;
     setPending(status);
@@ -83,16 +100,26 @@ export function Card({
           </div>
         )}
 
-        {announcement.payment_risk && (
-          <div className={styles.paymentRiskWarning}>
+        {paymentRiskWarning.message && (
+          <div
+            className={
+              paymentRiskWarning.severity === "language_and_domain"
+                ? `${styles.paymentRiskWarning} ${styles.paymentRiskWarningStrong}`
+                : styles.paymentRiskWarning
+            }
+          >
             <div className={styles.paymentRiskHeadline}>
               <WarningCircleIcon />
-              <span>Claims you&apos;ve already won, then asks for payment — a classic scam pattern</span>
+              <span>{paymentRiskWarning.message}</span>
+              {paymentRiskWarning.severity === "language_and_domain" && (
+                <span className={styles.paymentRiskSeverityBadge}>HIGH RISK</span>
+              )}
             </div>
-            {/* Domain info is context here, never the trigger — this fires
-                from the message text alone (verify-link.ts's
-                detectPaymentRiskPattern) regardless of the link's own
-                verification status, or even whether a link exists at all. */}
+            {/* Domain info is context here, never the trigger — the
+                warning fires from the message text alone (verify-link.ts's
+                detectPaymentRiskPattern), regardless of the link's own
+                verification status or whether a link exists at all; the
+                domain, when present, only ever compounds its severity. */}
             {announcement.link_url && (
               <div className={styles.paymentRiskLink}>
                 {announcement.link_url}

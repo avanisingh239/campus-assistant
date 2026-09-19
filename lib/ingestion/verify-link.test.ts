@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { verifyLink, TRUSTED_LINK_DOMAINS, detectPaymentRiskPattern } from "./verify-link";
+import {
+  verifyLink,
+  TRUSTED_LINK_DOMAINS,
+  detectPaymentRiskPattern,
+  assessDomainRisk,
+  combinePaymentRiskSeverity,
+} from "./verify-link";
 
 describe("verifyLink", () => {
   it("verifies a real chat.whatsapp.com invite link", () => {
@@ -94,5 +100,93 @@ describe("detectPaymentRiskPattern", () => {
         "You've won a fully-funded scholarship! Submit your documents and a small processing fee here: https://forms.gle/legit-looking",
       ),
     ).toBe(true);
+  });
+});
+
+describe("assessDomainRisk", () => {
+  it("flags a .xyz domain combined with 'claim' wording in the domain itself as high-risk", () => {
+    const result = assessDomainRisk("https://scholarship-claim-portal.xyz/verify");
+    expect(result.risky).toBe(true);
+    expect(result.reasons.some((r) => r.includes(".xyz") && r.includes("claim"))).toBe(true);
+  });
+
+  it("flags a shortened URL", () => {
+    const result = assessDomainRisk("https://bit.ly/abc123");
+    expect(result.risky).toBe(true);
+    expect(result.reasons.some((r) => r.toLowerCase().includes("shortener"))).toBe(true);
+  });
+
+  it("flags a plain http:// link as not using a secure connection", () => {
+    const result = assessDomainRisk("http://some-legit-looking-site.com/apply");
+    expect(result.risky).toBe(true);
+    expect(result.reasons.some((r) => r.toLowerCase().includes("https"))).toBe(true);
+  });
+
+  it("scores a well-formed https domain with no shortener and no suspicious TLD as low-risk", () => {
+    const result = assessDomainRisk("https://forms.gle/legit-scholarship-form");
+    expect(result.risky).toBe(false);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it("does not flag a suspicious TLD alone, with no claim-related wording in the domain", () => {
+    // A real small organization can legitimately use a .xyz domain —
+    // the task's own explicit "especially when combined with" framing
+    // means the TLD alone must not be enough.
+    const result = assessDomainRisk("https://my-robotics-club.xyz/events");
+    expect(result.risky).toBe(false);
+  });
+
+  it("flags a claimed institution that doesn't match the link's domain", () => {
+    const result = assessDomainRisk(
+      "https://random-payout-site.info/verify",
+      "You've been selected by the National Merit Foundation for a fully-funded scholarship.",
+    );
+    expect(result.risky).toBe(true);
+    expect(result.reasons.some((r) => r.includes("National Merit Foundation"))).toBe(true);
+  });
+
+  it("does not flag an institution mismatch when the domain plausibly relates to the claimed institution", () => {
+    const result = assessDomainRisk(
+      "https://nationalmerit.org/scholarship",
+      "You've been selected by the National Merit Foundation for a fully-funded scholarship.",
+    );
+    expect(result.risky).toBe(false);
+  });
+
+  it("returns risky: false, not a throw, for a malformed URL", () => {
+    expect(assessDomainRisk("not a url at all")).toEqual({ risky: false, reasons: [] });
+  });
+});
+
+describe("combinePaymentRiskSeverity", () => {
+  it("returns 'none' with no message when the phrase pattern did not fire, regardless of domain risk", () => {
+    // The critical false-positive guard: a legitimate message that merely
+    // uses an unfamiliar-but-real domain must never warn on domain signals
+    // alone.
+    const riskyDomain = assessDomainRisk("http://bit.ly/whatever");
+    expect(riskyDomain.risky).toBe(true);
+    const result = combinePaymentRiskSeverity(false, riskyDomain);
+    expect(result).toEqual({ severity: "none", message: null });
+  });
+
+  it("returns 'language_only' when the phrase pattern fired but the domain looks unremarkable", () => {
+    const calmDomain = assessDomainRisk("https://forms.gle/legit-scholarship-form");
+    const result = combinePaymentRiskSeverity(true, calmDomain);
+    expect(result.severity).toBe("language_only");
+    expect(result.message).toContain("classic scam pattern");
+    expect(result.message).not.toContain("shortener");
+  });
+
+  it("returns 'language_and_domain' with a stronger, more specific message when both fire together", () => {
+    const riskyDomain = assessDomainRisk("https://bit.ly/claim-now");
+    const languageOnly = combinePaymentRiskSeverity(true, { risky: false, reasons: [] });
+    const combined = combinePaymentRiskSeverity(true, riskyDomain);
+
+    expect(combined.severity).toBe("language_and_domain");
+    expect(combined.message).toContain("classic scam pattern");
+    expect(combined.message).toContain("shortener");
+    // The combined message is strictly a superset — everything the
+    // language-only warning says, plus the domain-specific detail.
+    expect(combined.message!.length).toBeGreaterThan(languageOnly.message!.length);
   });
 });
