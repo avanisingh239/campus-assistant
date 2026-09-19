@@ -18,6 +18,13 @@
  * especially with real user-safety stakes (a phishing link disguised as
  * a class group invite). No network access here either — this is a pure
  * string check, not a live reachability/reputation lookup.
+ *
+ * `detectPaymentRiskPattern` below is a second, later-added rule of the
+ * exact same shape — deterministic keyword matching, not an AI call — for
+ * a different real scam pattern: a message claiming an already-decided
+ * positive outcome ("you've been selected") that then asks for payment to
+ * release/claim/unlock it. See that function's own doc comment for the
+ * full reasoning and CLAUDE.md's own section on it.
  */
 
 /**
@@ -88,4 +95,73 @@ export function verifyLink(url: string, context: string): boolean {
   }
 
   return TRUSTED_LINK_DOMAINS.has(hostname);
+}
+
+/**
+ * Advance-fee scam detection — a real, well-documented fraud pattern
+ * ("you've already won, now pay to claim it") distinct from a normal
+ * application/registration fee, which is completely legitimate ("pay to
+ * apply/compete, outcome not yet known"). Same architecture as
+ * `claimsWhatsAppGroup`/`verifyLink` above: a deterministic keyword check,
+ * not an AI judgment call, per the task that added this — a blunt "does
+ * this message mention money" rule would wrongly flag genuine scholarships
+ * with real entrance/application fees, so the actual signal is the
+ * CO-OCCURRENCE of two specific phrase groups, not payment language alone.
+ *
+ * Deliberately two separate, ORed-within/ANDed-between groups rather than
+ * one combined list — a message needs at least one phrase from EACH group
+ * to flag, not just a high phrase count from either one alone. Both lists
+ * are short and literal on purpose (same "false unverified is cheaper than
+ * false verified" philosophy `TRUSTED_LINK_DOMAINS`'s own doc comment
+ * states) — grow them for a genuinely common real-world phrasing, never for
+ * "probably scammy."
+ */
+const ALREADY_WON_PHRASES = [
+  "congratulations",
+  "you've been selected",
+  "you have been selected",
+  "you've won",
+  "you have won",
+  "you've been chosen",
+  "you have been chosen",
+  "you've been awarded",
+  "you have been awarded",
+  "you are the winner",
+  "you're the winner",
+];
+
+const PAY_TO_CLAIM_PHRASES = [
+  "processing fee",
+  "claim it",
+  "claim your",
+  "claim this",
+  "to release",
+  "release your",
+  "unlock your",
+  "unlock this",
+  "clearance fee",
+  "claiming fee",
+  "activation fee",
+  "to claim",
+];
+
+/**
+ * True only when the raw source text contains BOTH an "already decided
+ * positive outcome" phrase (`ALREADY_WON_PHRASES`) AND a "pay to
+ * release/claim/unlock that outcome" phrase (`PAY_TO_CLAIM_PHRASES`) —
+ * the actual advance-fee-scam structure, not payment language in
+ * isolation. A normal registration/application fee message ("registration
+ * fee of ₹500 to apply for the XYZ scholarship exam") has no already-won
+ * framing at all, so it correctly never trips this. Deliberately domain-
+ * and channel-independent — unlike `verifyLink`, this never looks at the
+ * URL or at which pipeline (student paste vs. admin form) the message came
+ * through, per the task's own explicit point that neither should be
+ * treated as a risk/safety signal on its own; the content pattern alone is
+ * the whole signal.
+ */
+export function detectPaymentRiskPattern(context: string): boolean {
+  const lower = context.toLowerCase();
+  const hasAlreadyWonClaim = ALREADY_WON_PHRASES.some((phrase) => lower.includes(phrase));
+  const hasPayToClaim = PAY_TO_CLAIM_PHRASES.some((phrase) => lower.includes(phrase));
+  return hasAlreadyWonClaim && hasPayToClaim;
 }

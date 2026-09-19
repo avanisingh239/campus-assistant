@@ -16,6 +16,7 @@ function rawAnnouncement(overrides: Partial<RawAnnouncementRow> = {}): RawAnnoun
     deadline_at: "2026-09-20T18:00:00Z",
     link_url: null,
     link_verified: true,
+    payment_risk: false,
     seat_count: null,
     seats_unclear: false,
     priority_score: 0,
@@ -29,6 +30,11 @@ describe("shapeAnnouncements", () => {
   it("defaults engagement status to 'none' when there's no status row", () => {
     const [result] = shapeAnnouncements([rawAnnouncement()], [], [], [], []);
     expect(result.engagementStatus).toBe("none");
+  });
+
+  it("passes payment_risk straight through from the raw row", () => {
+    const [result] = shapeAnnouncements([rawAnnouncement({ payment_risk: true })], [], [], [], []);
+    expect(result.payment_risk).toBe(true);
   });
 
   it("attaches the matching engagement status", () => {

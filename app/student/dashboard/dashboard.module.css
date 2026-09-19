@@ -523,6 +523,46 @@
   }
 }
 
+/* Advance-fee scam warning — reuses the same --urgent/--urgent-bg red pair
+   the URGENT ribbon above already uses ("styled consistently with existing
+   urgent/warning colors" per the task), but as a full-width solid block
+   rather than a small rotated corner tag, so it reads as visually distinct
+   from both .urgentTag and the plain inline .unverified text used
+   elsewhere — the stakes here are financial fraud, not a stale invite. */
+.paymentRiskWarning {
+  background: var(--urgent-bg);
+  border: 2px solid var(--urgent);
+  border-radius: 10px;
+  padding: 9px 11px;
+  margin-bottom: 11px;
+}
+.paymentRiskHeadline {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--urgent);
+  line-height: 1.4;
+}
+.paymentRiskHeadline svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.paymentRiskLink {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 7px;
+  font-size: 11.5px;
+  color: var(--urgent);
+  font-weight: 600;
+  word-break: break-all;
+}
+
 .cbadge {
   font-size: 10.5px;
   font-weight: 700;

@@ -83,6 +83,25 @@ export function Card({
           </div>
         )}
 
+        {announcement.payment_risk && (
+          <div className={styles.paymentRiskWarning}>
+            <div className={styles.paymentRiskHeadline}>
+              <WarningCircleIcon />
+              <span>Claims you&apos;ve already won, then asks for payment — a classic scam pattern</span>
+            </div>
+            {/* Domain info is context here, never the trigger — this fires
+                from the message text alone (verify-link.ts's
+                detectPaymentRiskPattern) regardless of the link's own
+                verification status, or even whether a link exists at all. */}
+            {announcement.link_url && (
+              <div className={styles.paymentRiskLink}>
+                {announcement.link_url}
+                {!announcement.link_verified && <span className={styles.unverified}>⚠️ Unverified domain</span>}
+              </div>
+            )}
+          </div>
+        )}
+
         <span className={`${styles.cbadge} ${confidence.className}`}>{confidence.label}</span>
         <p className={styles.cardTitle}>{announcement.title}</p>
 

@@ -47,6 +47,7 @@ export interface DashboardAnnouncement {
   deadline_at: string | null;
   link_url: string | null;
   link_verified: boolean;
+  payment_risk: boolean;
   seat_count: number | null;
   seats_unclear: boolean;
   priority_score: number;

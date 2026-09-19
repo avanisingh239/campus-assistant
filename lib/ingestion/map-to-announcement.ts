@@ -1,5 +1,5 @@
 import type { ExtractedAnnouncement } from "@/lib/ai/extraction-schema";
-import { verifyLink } from "./verify-link";
+import { verifyLink, detectPaymentRiskPattern } from "./verify-link";
 
 /**
  * Pure transform from a validated Claude extraction item to an
@@ -45,6 +45,11 @@ export function toAnnouncementRow(item: ExtractedAnnouncement, rawMessageText: s
     // No link at all means "unverified" is meaningless — true matches the
     // column's own DB default rather than flagging a link that isn't there.
     link_verified: item.link_url === null ? true : verifyLink(item.link_url, rawMessageText),
+    // Unlike link_verified, computed unconditionally — the advance-fee-scam
+    // pattern this detects (an "already won" claim plus a "pay to claim it"
+    // ask) is text-based, not tied to whether a link was even extracted.
+    // See lib/ingestion/verify-link.ts's own doc comment.
+    payment_risk: detectPaymentRiskPattern(rawMessageText),
   };
 }
 

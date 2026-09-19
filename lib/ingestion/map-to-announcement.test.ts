@@ -81,4 +81,26 @@ describe("toAnnouncementRow", () => {
     const row = toAnnouncementRow({ ...base, link_url: null }, "No link in this one.");
     expect(row.link_verified).toBe(true);
   });
+
+  it("computes payment_risk deterministically from the raw message text", () => {
+    const row = toAnnouncementRow(
+      base,
+      "Congratulations! You've been selected for a fully-funded scholarship. Claim it now by submitting a small processing fee.",
+    );
+    expect(row.payment_risk).toBe(true);
+  });
+
+  it("does not flag payment_risk for a normal application fee with no already-won framing", () => {
+    const row = toAnnouncementRow(base, "Registration fee of ₹500 to apply for the XYZ scholarship exam.");
+    expect(row.payment_risk).toBe(false);
+  });
+
+  it("computes payment_risk regardless of whether a link was extracted at all", () => {
+    const row = toAnnouncementRow(
+      { ...base, link_url: null },
+      "Congratulations, you've won! Pay a processing fee to claim your prize.",
+    );
+    expect(row.link_url).toBeNull();
+    expect(row.payment_risk).toBe(true);
+  });
 });

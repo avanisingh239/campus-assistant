@@ -45,6 +45,11 @@ export function HowThisWorks() {
             cluttering your priorities — but it&apos;s not gone. You can review and change your mind
             anytime from the dismissed items section below your feed.
           </p>
+          <p>
+            We flag messages that claim you&apos;ve already won something and then ask you to pay to claim
+            it — a classic scam pattern. A normal registration or application fee, paid before any outcome
+            is known, isn&apos;t flagged.
+          </p>
         </div>
       )}
     </div>

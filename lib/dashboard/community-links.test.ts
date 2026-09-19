@@ -17,6 +17,7 @@ function link(overrides: Partial<DashboardAnnouncement> = {}): DashboardAnnounce
     deadline_at: null,
     link_url: "https://chat.whatsapp.com/robotics",
     link_verified: true,
+    payment_risk: false,
     seat_count: null,
     seats_unclear: false,
     priority_score: 0,
